@@ -4,8 +4,10 @@ import 'package:final_project/domain/entities/quest.dart';
 import 'package:final_project/core/services/camera_service.dart'; // Import CameraService
 import 'package:image_picker/image_picker.dart'; // You'll need this package
 import 'dart:io';
-import 'package:final_project/domain/repositories/quest_repository.dart';
-import 'package:final_project/presentation/providers/quest_provider.dart';
+import 'package:final_project/domain/repositories/quest_repository.dart'; // Corrected import
+import 'package:final_project/core/usecases/usecase.dart'; // Import usecase.dart
+import 'package:dartz/dartz.dart'; // Import Either
+import 'package:final_project/core/error/failures.dart'; // Import Failure
 
 // Define the SubmitPhotoAnswerParams and UseCase
 class SubmitPhotoAnswerParams {
@@ -16,20 +18,31 @@ class SubmitPhotoAnswerParams {
 }
 
 class SubmitPhotoAnswerUseCase
-    implements FutureUseCase<void, SubmitPhotoAnswerParams> {
+    implements ParamFutureUseCase<SubmitPhotoAnswerParams, void> {
+  // Implement ParamFutureUseCase
   final QuestRepository _questRepository;
 
-  SubmitPhotoAnswerUseCase({required this.questRepository});
+  SubmitPhotoAnswerUseCase(
+      {required QuestRepository questRepository}) // Corrected constructor
+      : _questRepository = questRepository;
 
   @override
-  Future<void> execute(SubmitPhotoAnswerParams params) async {
-    await _questRepository.uploadPhoto(params.questId, params.imagePath);
+  Future<Either<Failure, void>> call(SubmitPhotoAnswerParams params) async {
+    // Use call and Either
+    // Assuming uploadPhoto returns Future<Either<Failure, void>>
+    return await _questRepository.uploadPhoto(params.questId, params.imagePath);
   }
 }
 
+// QuestRepository provider (ensure this is defined correctly)
+final questRepositoryProvider = Provider<QuestRepository>((ref) {
+  throw UnimplementedError(); // Implement this provider
+});
+
 final submitPhotoAnswerUseCaseProvider = Provider<SubmitPhotoAnswerUseCase>(
   (ref) => SubmitPhotoAnswerUseCase(
-      questRepository: ref.read(questRepositoryProvider)),
+    questRepository: ref.read(questRepositoryProvider),
+  ),
 );
 
 class PhotoChallengeQuestWidget extends ConsumerStatefulWidget {
@@ -83,16 +96,37 @@ class _PhotoChallengeQuestWidgetState
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () async {
-              await submitPhoto.execute(
-                SubmitPhotoAnswerParams(
-                    questId: widget.quest.id, imagePath: _pickedImage!.path),
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Photo submitted!')),
-              );
-              setState(() {
-                _pickedImage = null; // Clear image after submission
-              });
+              if (_pickedImage != null) {
+                final result = await submitPhoto.call(
+                  // Use call()
+                  SubmitPhotoAnswerParams(
+                      questId:
+                          widget.quest.id!, // Use null assertion or handle null
+                      imagePath: _pickedImage!.path),
+                );
+                result.fold(
+                  (failure) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${failure.message}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  },
+                  (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Photo submitted!')),
+                    );
+                    setState(() {
+                      _pickedImage = null; // Clear image after submission
+                    });
+                  },
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please take a photo first.')),
+                );
+              }
             },
             child: const Text('Submit Photo'),
           ),
