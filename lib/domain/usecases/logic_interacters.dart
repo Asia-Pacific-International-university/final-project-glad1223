@@ -1,6 +1,6 @@
 import 'package:final_project/core/usecases/usecase.dart';
 import 'package:final_project/domain/repositories/quest_repository.dart';
-import 'package:final_project/domain/repositories/user_repository.dart';
+import 'package:final_project/domain/repositories/user_repositories.dart';
 import 'package:final_project/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
