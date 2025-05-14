@@ -1,9 +1,8 @@
-class LeaderboardEntry {
-  final String facultyName;
-  final int points;
+import 'package:final_project/domain/entities/leaderboard_entry.dart';
 
-  LeaderboardEntry({required this.facultyName, required this.points});
+class Leaderboard {
+  final DateTime lastUpdated;
+  final List<LeaderboardEntry> entries;
 
-  // You might want to add factory methods for creating this
-  // entity from your data models later.
+  Leaderboard({required this.lastUpdated, required this.entries});
 }

@@ -1,4 +1,4 @@
-import 'package:final_project/core/usecases/usecase.dart';
+import 'package:final_project/core/usecases/testing';
 import 'package:final_project/domain/entities/quest.dart';
 import 'package:final_project/domain/repositories/quest_repository.dart';
 
