@@ -1,16 +1,18 @@
 import 'package:final_project/data/datasources/remote/quest_remote_datasource.dart';
 import 'package:final_project/domain/entities/quest.dart';
 import 'package:final_project/domain/repositories/quest_repository.dart';
+//import 'package:final_project/data/models/quest_model.dart'; // Assuming QuestModel is in this path
 
 class QuestRepositoryImpl implements QuestRepository {
   final QuestRemoteDataSource _remoteDataSource;
 
-  QuestRepositoryImpl({required this.remoteDataSource});
+  QuestRepositoryImpl({required QuestRemoteDataSource remoteDataSource})
+      : _remoteDataSource = remoteDataSource;
 
   @override
   Future<Quest?> getActiveQuest() async {
     final questModel = await _remoteDataSource.getActiveQuest();
-    return questModel?.toEntity();
+    return questModel?.toDomain();
   }
 
   @override

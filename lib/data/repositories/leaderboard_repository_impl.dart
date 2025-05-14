@@ -3,7 +3,7 @@ import '../../domain/entities/leaderboard_entry.dart';
 import '../../domain/repositories/leaderboard_repositories.dart';
 import '../../core/error/failures.dart';
 import '../datasources/remote/api_client.dart'; // Assuming you have an ApiClient
-import '../models/leaderboard_model.dart'; // Assuming you have a LeaderboardModel (or directly use List<LeaderboardEntry>)
+//import '../models/leaderboard_model.dart'; // Assuming you have a LeaderboardModel (or directly use List<LeaderboardEntry>)
 
 class LeaderboardRepositoryImpl implements LeaderboardRepositories {
   final ApiClient _apiClient;

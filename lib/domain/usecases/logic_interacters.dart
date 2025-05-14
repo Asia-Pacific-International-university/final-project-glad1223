@@ -7,7 +7,7 @@ import 'package:dartz/dartz.dart';
 class ProcessQuestSubmissionUseCase
     implements FutureUseCase<void, ProcessQuestSubmissionParams> {
   final QuestRepository _questRepository;
-  final UserRepository _userRepository; // Example: to update user points
+  final UserRepositories _userRepository; // Example: to update user points
 
   ProcessQuestSubmissionUseCase(
       {required questRepository, required userRepository})

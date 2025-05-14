@@ -30,11 +30,12 @@ class UserModel {
 
   User toDomain() {
     return User(
-      id: id,
-      username: username,
-      email: email,
+      id: id ??
+          '', // Provide a default non-null value (empty string in this case)
+      username: username ?? '', // Provide a default non-null value
+      email: email ?? '', // Provide a default non-null value
       faculty: faculty,
-      totalPoints: totalPoints,
+      totalPoints: totalPoints ?? 0, // Provide a default value for int?
       badges: badges,
     );
   }
