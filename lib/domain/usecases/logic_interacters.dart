@@ -5,28 +5,32 @@ import 'package:final_project/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
 class ProcessQuestSubmissionUseCase
-    implements FutureUseCase<void, ProcessQuestSubmissionParams> {
+    implements ParamFutureUseCase<ProcessQuestSubmissionParams, void> {
+  // Corrected implements clause
   final QuestRepository _questRepository;
   final UserRepositories _userRepository; // Example: to update user points
 
   ProcessQuestSubmissionUseCase(
-      {required questRepository, required userRepository})
+      {required QuestRepository questRepository,
+      required UserRepositories
+          userRepository}) // Corrected constructor parameters
       : _questRepository = questRepository,
         _userRepository = userRepository;
 
   @override
-  Future<Either<Failure, void>> execute(
+  Future<Either<Failure, void>> call(
       ProcessQuestSubmissionParams params) async {
     // 1. Submit the answer to the quest repository
     final submissionResult = await _questRepository.submitTriviaAnswer(
         params.questId, params.answer);
     return submissionResult.fold(
       (failure) => Left(failure),
-      (_) async {
+      (success) {
+        // Remove the 'async' keyword here
         // 2. If submission is successful, update user points (example)
         // final updateResult = await _userRepository.addPoints(params.userId, params.pointsAwarded);
         // return updateResult; // Assuming userRepository.addPoints returns Either<Failure, void>
-        return const Right(null); // If no user update needed here
+        return const Right(null); // Now returning a direct Either
       },
     );
   }

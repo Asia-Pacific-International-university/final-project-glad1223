@@ -1,6 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:final_project/domain/entities/quest.dart';
 import 'package:final_project/domain/usecases/get_active_quest_usecase.dart';
+import 'package:final_project/domain/repositories/quest_repository.dart';
+import 'package:final_project/data/repositories/quest_repository_impl.dart';
+import 'package:final_project/data/datasources/remote/quest_remote_datasource.dart';
+import 'package:final_project/data/datasources/remote/quest_remote_datasource_impl.dart';
+import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart';
 
 class QuestNotifier extends StateNotifier<AsyncValue<Quest?>> {
   final GetActiveQuestUseCase _getActiveQuestUseCase;

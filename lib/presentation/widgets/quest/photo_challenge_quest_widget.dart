@@ -4,6 +4,8 @@ import 'package:final_project/domain/entities/quest.dart';
 import 'package:final_project/core/services/camera_service.dart'; // Import CameraService
 import 'package:image_picker/image_picker.dart'; // You'll need this package
 import 'dart:io';
+import 'package:final_project/domain/repositories/quest_repository.dart';
+import 'package:final_project/presentation/providers/quest_provider.dart';
 
 // Define the SubmitPhotoAnswerParams and UseCase
 class SubmitPhotoAnswerParams {

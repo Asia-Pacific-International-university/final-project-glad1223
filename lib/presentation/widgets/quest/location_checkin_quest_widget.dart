@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:final_project/domain/entities/quest.dart';
 import 'package:final_project/core/services/location_service.dart'; // Import LocationService
 import 'package:geolocator/geolocator.dart'; // You'll need this package
+import 'package:final_project/core/usecases/usecase.dart'; // Import usecase.dart
+import 'package:final_project/domain/repositories/quest_repository.dart'; // Import QuestRepository
 
 // Define the SubmitLocationAnswerParams and UseCase in your providers or usecases
 class SubmitLocationAnswerParams {
@@ -15,22 +17,35 @@ class SubmitLocationAnswerParams {
 }
 
 class SubmitLocationAnswerUseCase
-    implements FutureUseCase<void, SubmitLocationAnswerParams> {
+    implements ParamFutureUseCase<SubmitLocationAnswerParams, void> {
+  // Implement ParamFutureUseCase
   final QuestRepository _questRepository;
 
-  SubmitLocationAnswerUseCase({required this.questRepository});
+  SubmitLocationAnswerUseCase({required QuestRepository questRepository})
+      : _questRepository = questRepository;
 
   @override
-  Future<void> execute(SubmitLocationAnswerParams params) async {
+  Future<Either<Failure, void>> call(SubmitLocationAnswerParams params) async {
+    // Use call and Either
+    // Assuming submitCheckInLocation returns Future<Either<Failure, void>>
     return await _questRepository.submitCheckInLocation(
-        params.questId, params.latitude, params.longitude);
+      params.questId,
+      params.latitude,
+      params.longitude,
+    );
   }
 }
+
+//  QuestRepository provider (ensure this is defined correctly)
+final questRepositoryProvider = Provider<QuestRepository>((ref) {
+  throw UnimplementedError(); //  Implement this provider
+});
 
 final submitLocationAnswerUseCaseProvider =
     Provider<SubmitLocationAnswerUseCase>(
   (ref) => SubmitLocationAnswerUseCase(
-      questRepository: ref.read(questRepositoryProvider)),
+    questRepository: ref.read(questRepositoryProvider),
+  ),
 );
 
 class LocationCheckInQuestWidget extends ConsumerStatefulWidget {
@@ -86,16 +101,40 @@ class _LocationCheckInQuestWidgetState
         if (_currentPosition != null)
           ElevatedButton(
             onPressed: () async {
-              await submitLocation.execute(
-                SubmitLocationAnswerParams(
-                  questId: widget.quest.id,
-                  latitude: _currentPosition!.latitude,
-                  longitude: _currentPosition!.longitude,
-                ),
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Location submitted!')),
-              );
+              try {
+                final result = await submitLocation.call(
+                  // Use call()
+                  SubmitLocationAnswerParams(
+                    questId: widget.quest.id,
+                    latitude: _currentPosition!.latitude,
+                    longitude: _currentPosition!.longitude,
+                  ),
+                );
+                result.fold(
+                  (failure) {
+                    // Handle failure (e.g., show error message)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${failure.message}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  },
+                  (success) {
+                    // Handle success (e.g., show success message)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Location submitted!')),
+                    );
+                  },
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('An unexpected error occurred: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             child: const Text('Submit Location'),
           ),
