@@ -19,6 +19,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   dartz: ^0.10.1 # Functional programming in Dart
   get_it: ^7.6.7 # Add the get_it dependency here (use the latest version)
+  image_picker: ^1.1.1 # Add image_picker dependency
+  geolocator: ^11.0.0 # Add geolocator dependency
 
 dev_dependencies:
   flutter_test:

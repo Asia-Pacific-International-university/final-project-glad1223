@@ -1,4 +1,5 @@
 import '../../domain/entities/quest.dart';
+import 'package:collection/collection.dart';
 
 enum QuestType { trivia, poll, locationCheckIn, photoChallenge, miniPuzzle }
 
