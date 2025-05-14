@@ -1,5 +1,6 @@
+// *** lib/data/datasources/remote/auth_remote_datasource.dart ***
 import '../../../core/error/failures.dart';
-import 'package:final_project/data/models/user_model.dart';
+import '../../models/user_model.dart';
 import 'api_client.dart';
 
 abstract class AuthRemoteDataSource {

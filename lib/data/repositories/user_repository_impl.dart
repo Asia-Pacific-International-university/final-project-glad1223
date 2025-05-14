@@ -5,7 +5,7 @@ import '../../core/error/failures.dart';
 import '../datasources/remote/api_client.dart'; // Assuming you have an ApiClient
 import '../models/user_model.dart'; // Assuming you have a UserModel
 
-class UserRepositoryImpl implements UserRepository {
+class UserRepositoryImpl implements UserRepositories {
   final ApiClient _apiClient; // Inject your API client
 
   UserRepositoryImpl(this._apiClient);

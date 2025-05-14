@@ -12,7 +12,8 @@ class AuthProvider extends ChangeNotifier {
   final SignInUseCase _signInUseCase;
   final AuthRepository _authRepository;
 
-  AuthProvider(this._signUpUseCase, this._signInUseCase, this._authRepository);
+  AuthProvider(this._signUpUseCase, this._signInUseCase,
+      this._authRepository); // Updated constructor
 
   User? _user;
   User? get user => _user;
@@ -43,7 +44,7 @@ class AuthProvider extends ChangeNotifier {
     }
 
     final result = await _signUpUseCase(SignUpParams(
-      username: username,
+      username: username, // Assuming your SignUpParams now includes username
       email: email,
       password: password,
       faculty: _selectedFaculty!,

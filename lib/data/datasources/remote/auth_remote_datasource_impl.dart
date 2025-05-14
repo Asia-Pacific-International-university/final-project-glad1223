@@ -1,6 +1,8 @@
+// *** lib/data/datasources/remote/auth_remote_datasource_impl.dart ***
+import '../../../core/error/failures.dart';
+import '../../models/user_model.dart';
+import 'api_client.dart';
 import 'auth_remote_datasource.dart';
-import 'package:final_project/data/models/user_model.dart';
-import 'api_client.dart'; // Assuming you have an ApiClient
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final ApiClient _apiClient;
@@ -8,39 +10,57 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl(this._apiClient);
 
   @override
-  Future<UserModel> signUp(
-      String username, String email, String password, String faculty) async {
-    final response = await _apiClient.post('/auth/signup', body: {
-      'username': username,
-      'email': email,
-      'password': password,
-      'faculty': faculty,
-    });
-    return UserModel.fromJson(response);
+  Future<UserModel> signIn(String email, String password) async {
+    try {
+      final response = await _apiClient
+          .post('/auth/login', body: {'email': email, 'password': password});
+      return UserModel.fromJson(response);
+    } catch (e) {
+      // Handle specific error codes and throw appropriate exceptions/Failures
+      throw ServerFailure('Login failed: ${e.toString()}');
+    }
   }
 
   @override
-  Future<UserModel> signIn(String email, String password) async {
-    final response = await _apiClient.post('/auth/login', body: {
-      'email': email,
-      'password': password,
-    });
-    return UserModel.fromJson(response);
+  Future<UserModel> signUp(
+      String username, String email, String password, String faculty) async {
+    try {
+      final response = await _apiClient.post('/auth/signup', body: {
+        'username': username,
+        'email': email,
+        'password': password,
+        'faculty': faculty
+      });
+      return UserModel.fromJson(response);
+    } catch (e) {
+      // Handle specific error codes
+      throw ServerFailure('Signup failed: ${e.toString()}');
+    }
   }
 
   @override
   Future<void> signOut() async {
-    await _apiClient
-        .post('/auth/logout', body: {}); // Or however your API handles logout
+    try {
+      await _apiClient.post('/auth/logout',
+          body: {}); // Or however your logout API is structured
+    } catch (e) {
+      // Optionally handle logout errors
+      print('Logout failed: ${e.toString()}');
+    }
   }
 
   @override
   Future<UserModel?> getCurrentUser() async {
-    final response =
-        await _apiClient.get('/auth/me'); // Endpoint to get current user
-    if (response != null) {
-      return UserModel.fromJson(response);
+    try {
+      final response = await _apiClient
+          .get('/auth/me'); // Or /auth/status, adjust based on your API
+      if (response != null && response is Map<String, dynamic>) {
+        return UserModel.fromJson(response);
+      }
+      return null;
+    } catch (e) {
+      // If no active session, the API might return an error or null
+      return null;
     }
-    return null;
   }
 }

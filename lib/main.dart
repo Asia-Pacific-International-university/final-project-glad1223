@@ -5,43 +5,68 @@ import 'core/theme/theme_provider.dart';
 import 'core/navigation/app_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get_it/get_it.dart';
-import 'data/repositories/auth_repository_impl.dart';
-import 'domain/repositories/user_repositories.dart'; // Assuming this path
+import 'domain/repositories/user_repositories.dart';
 import 'data/repositories/user_repository_impl.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/profile_provider.dart';
 import 'data/repositories/leaderboard_repository_impl.dart';
-import 'package:final_project/domain/repositories/leaderboard_repositories.dart'; // Assuming this path
+import 'package:final_project/domain/repositories/leaderboard_repositories.dart';
 import 'presentation/providers/leaderboard_provider.dart';
-import 'data/datasources/remote/api_client.dart'; // Assuming you'll create this
+import 'data/datasources/remote/api_client.dart';
+import 'domain/repositories/auth_repository.dart';
+import 'data/repositories/auth_repository_impl.dart';
+import 'domain/usecases/sign_up_usecase.dart';
+import 'domain/usecases/sign_in_usecase.dart';
+import 'data/datasources/remote/auth_remote_datasource.dart';
+import 'data/datasources/remote/auth_remote_datasource_impl.dart'
+    as auth_remote_impl; // Add a prefix
 
 final getIt = GetIt.instance;
 
 void setupDependencies() {
-  // Register your ApiClient
-  getIt.registerLazySingleton(
-      () => ApiClient()); // Initialize with your base URL
+  // Register your ApiClient (using the concrete implementation)
+  getIt.registerLazySingleton<ApiClient>(
+    () => HttpApiClient(),
+  );
+
+  // Register your remote data source
+  getIt.registerLazySingleton<AuthRemoteDataSource>(
+    () => auth_remote_impl.AuthRemoteDataSourceImpl(
+        getIt<ApiClient>()), // Use the prefix
+  );
 
   // Register your repositories
   getIt.registerLazySingleton<UserRepositories>(
-      () => UserRepositoryImpl(getIt<ApiClient>()));
+    () => UserRepositoryImpl(getIt<ApiClient>()),
+  );
   getIt.registerLazySingleton<LeaderboardRepositories>(
-      () => LeaderboardRepositoryImpl(getIt<ApiClient>()));
-  // getIt.registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl(getIt<ApiClient>(), getIt<SharedPreferencesService>())); // Example
+    () => LeaderboardRepositoryImpl(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<AuthRepository>(
+    () => AuthRepositoryImpl(getIt<AuthRemoteDataSource>()),
+  );
+
+  // Register your use cases
+  getIt.registerLazySingleton(
+      () => SignUpUseCase(authRepository: getIt<AuthRepository>()));
+  getIt.registerLazySingleton(() => SignInUseCase(getIt<AuthRepository>()));
 
   // Register your providers
-  getIt.registerChangeNotifier(() => AuthProvider(getIt<UserRepositories>()));
-  getIt
-      .registerChangeNotifier(() => ProfileProvider(getIt<UserRepositories>()));
-  getIt.registerChangeNotifier(
+  getIt.registerFactory(() => AuthProvider(
+        getIt<SignUpUseCase>(),
+        getIt<SignInUseCase>(),
+        getIt<AuthRepository>(),
+      ));
+  getIt.registerFactory(() => ProfileProvider(getIt<UserRepositories>()));
+  getIt.registerFactory(
       () => LeaderboardProvider(getIt<LeaderboardRepositories>()));
-  getIt.registerChangeNotifier(() => ThemeProvider());
+  getIt.registerFactory(() => ThemeProvider());
   getIt.registerLazySingleton(() => AppRouter());
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  await Firebase.initializeApp();
 
   setupDependencies();
 
@@ -58,8 +83,7 @@ void main() async {
             create: (_) => getIt<LeaderboardProvider>()),
         Provider<AppRouter>(create: (_) => getIt<AppRouter>()),
       ],
-      child:
-          const CampusPulseChallengeApp(), // Using the app widget with GoRouter
+      child: const CampusPulseChallengeApp(),
     ),
   );
 }

@@ -5,7 +5,7 @@ import '../../core/error/failures.dart';
 import '../datasources/remote/api_client.dart'; // Assuming you have an ApiClient
 import '../models/leaderboard_model.dart'; // Assuming you have a LeaderboardModel (or directly use List<LeaderboardEntry>)
 
-class LeaderboardRepositoryImpl implements LeaderboardRepository {
+class LeaderboardRepositoryImpl implements LeaderboardRepositories {
   final ApiClient _apiClient;
 
   LeaderboardRepositoryImpl(this._apiClient);
