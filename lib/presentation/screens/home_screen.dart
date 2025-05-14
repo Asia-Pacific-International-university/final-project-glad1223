@@ -15,8 +15,9 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Access user data from AuthProvider (replace with dedicated UserProvider later if needed)
+    // Access user data from AuthProvider
     final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user; // Get the User object
 
     return Scaffold(
       appBar: AppBar(
@@ -44,9 +45,9 @@ class HomeScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 10),
-              // Display user info (using placeholder data from AuthProvider)
-              if (authProvider.userEmail != null)
-                Text('Email: ${authProvider.userEmail}'),
+              // Display user info by accessing the email property of the User object
+              if (user != null && user.email != null)
+                Text('Email: ${user.email}'),
               if (authProvider.selectedFaculty != null)
                 Text('Faculty: ${authProvider.selectedFaculty}'),
               const SizedBox(height: 40),

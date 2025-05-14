@@ -17,4 +17,16 @@ class LeaderboardRemoteDataSourceImpl implements LeaderboardRemoteDataSource {
                 FacultyModel.fromJson(doc.data() as Map<String, dynamic>))
             .toList());
   }
+
+  @override
+  Future<List<FacultyModel>> getFacultyLeaderboardSnapshot() async {
+    final snapshot = await _firestore
+        .collection(
+            'faculties') // Replace 'faculties' with your actual collection name
+        .orderBy('points', descending: true)
+        .get();
+    return snapshot.docs
+        .map((doc) => FacultyModel.fromJson(doc.data() as Map<String, dynamic>))
+        .toList();
+  }
 }

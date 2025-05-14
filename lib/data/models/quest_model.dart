@@ -1,11 +1,9 @@
-import '../../domain/entities/quest.dart';
-import 'package:collection/collection.dart';
-
-enum QuestType { trivia, poll, locationCheckIn, photoChallenge, miniPuzzle }
+import '../../domain/entities/quest.dart'; // Import the Quest entity
+//import 'package:collection/collection.dart';
 
 class QuestModel {
   final String? id;
-  final QuestType? type;
+  final QuestType? type; // Now correctly using the domain's QuestType
   final String? question; // For trivia, polls, puzzles
   final List<String>? options; // For trivia, polls
   final String? correctAnswer; // For trivia, puzzles
@@ -33,7 +31,7 @@ class QuestModel {
   factory QuestModel.fromJson(Map<String, dynamic> json) {
     return QuestModel(
       id: json['id'] as String?,
-      type: $enumDecodeNullable(_$QuestTypeEnumMap, json['type']),
+      type: _decodeQuestType(json['type']), // Use a custom decoding function
       question: json['question'] as String?,
       options: (json['options'] as List<dynamic>?)?.cast<String>(),
       correctAnswer: json['correctAnswer'] as String?,
@@ -51,7 +49,7 @@ class QuestModel {
   Quest toDomain() {
     return Quest(
       id: id,
-      type: type,
+      type: type, // Now these types should match
       question: question,
       options: options,
       correctAnswer: correctAnswer,
@@ -67,7 +65,7 @@ class QuestModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'type': _$QuestTypeEnumMap[type],
+      'type': _encodeQuestType(type), // Use a custom encoding function
       'question': question,
       'options': options,
       'correctAnswer': correctAnswer,
@@ -81,38 +79,43 @@ class QuestModel {
   }
 }
 
-const _$QuestTypeEnumMap = <QuestType, dynamic>{
-  QuestType.trivia: 'trivia',
-  QuestType.poll: 'poll',
-  QuestType.locationCheckIn: 'locationCheckIn',
-  QuestType.photoChallenge: 'photoChallenge',
-  QuestType.miniPuzzle: 'miniPuzzle',
-};
-
-T? $enumDecodeNullable<T>(Map<T, dynamic> enumValues, dynamic source) {
+// Custom function to decode the QuestType from JSON
+QuestType? _decodeQuestType(dynamic source) {
   if (source == null) {
     return null;
   }
-  return enumValues.entries.singleWhereOrNull((e) => e.value == source)?.key;
+  switch (source as String) {
+    case 'trivia':
+      return QuestType.trivia;
+    case 'poll':
+      return QuestType.poll;
+    case 'locationCheckIn':
+      return QuestType.locationCheckIn;
+    case 'photoChallenge':
+      return QuestType.photoChallenge;
+    case 'miniPuzzle':
+      return QuestType.miniPuzzle;
+    default:
+      return null; // Or throw an error if an unknown value is encountered
+  }
 }
 
-T $enumDecode<T>(Map<T, dynamic> enumValues, dynamic source,
-    {T? unknownValue}) {
-  if (source == null) {
-    throw ArgumentError('A required value must be provided but was null.');
+// Custom function to encode the QuestType to JSON
+String? _encodeQuestType(QuestType? type) {
+  switch (type) {
+    case QuestType.trivia:
+      return 'trivia';
+    case QuestType.poll:
+      return 'poll';
+    case QuestType.locationCheckIn:
+      return 'locationCheckIn';
+    case QuestType.photoChallenge:
+      return 'photoChallenge';
+    case QuestType.miniPuzzle:
+      return 'miniPuzzle';
+    default:
+      return null;
   }
-  return enumValues.entries.singleWhere(
-    (e) => e.value == source,
-    orElse: () {
-      if (unknownValue == null) {
-        throw ArgumentError(
-          '`$source` is not one of the supported values: '
-          '`${enumValues.values.join(', ')}`',
-        );
-      }
-      return MapEntry(unknownValue, enumValues.values.first);
-    },
-  ).key;
 }
 
 extension CollectionExtension<E> on Iterable<E> {

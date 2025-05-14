@@ -1,11 +1,39 @@
 import 'package:flutter/material.dart';
 
-/// Defines the application's light and dark themes.
 class AppTheme {
-  // Define a primary color swatch
-  static const MaterialColor primaryColorSwatch =
-      Color.fromARGB(255, 0, 40, 70);
-  static const int _primaryColorValue = 0xFF2196F3; // A shade of blue
+  // Define your primary color
+  static const Color primaryColor = Color.fromARGB(255, 0, 40, 70);
+
+  // Create a MaterialColor from the primaryColor
+  static MaterialColor primaryColorSwatch = _createPrimarySwatch(primaryColor);
+
+  static MaterialColor _createPrimarySwatch(Color color) {
+    List<int> strengths = <int>[
+      50,
+      100,
+      200,
+      300,
+      400,
+      500,
+      600,
+      700,
+      800,
+      900
+    ];
+    Map<int, Color> swatch = <int, Color>{};
+    final int r = color.red, g = color.green, b = color.blue;
+
+    for (int strength in strengths) {
+      final double ds = 0.5 - (strength / 1000);
+      swatch[strength] = Color.fromRGBO(
+        r + ((ds < 0 ? r : (255 - r)) * ds).round(),
+        g + ((ds < 0 ? g : (255 - g)) * ds).round(),
+        b + ((ds < 0 ? b : (255 - b)) * ds).round(),
+        1,
+      );
+    }
+    return MaterialColor(color.value, swatch);
+  }
 
   // Light Theme
   static ThemeData lightTheme = ThemeData(
