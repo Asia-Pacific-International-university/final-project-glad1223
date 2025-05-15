@@ -18,7 +18,8 @@ class SignUpParams {
   });
 }
 
-class SignUpUseCase implements UseCase<User, SignUpParams> {
+class SignUpUseCase implements ParamFutureUseCase<SignUpParams, User> {
+  // Change to ParamFutureUseCase
   final AuthRepository _authRepository;
 
   SignUpUseCase(this._authRepository);
