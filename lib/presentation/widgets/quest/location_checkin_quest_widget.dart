@@ -1,24 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:final_project/domain/entities/quest.dart';
-import 'package:final_project/core/services/location_service.dart'; // Import LocationService
-import 'package:geolocator/geolocator.dart'; // You'll need this package
-import 'package:final_project/core/usecases/usecase.dart'; // Import usecase.dart
-import 'package:final_project/domain/repositories/quest_repository.dart'; // Import QuestRepository
+import 'package:geolocator/geolocator.dart';
+import 'package:dartz/dartz.dart';
 
-// Define the SubmitLocationAnswerParams and UseCase in your providers or usecases
+// 1. Domain Entity (Simplified for this example)
+class Quest {
+  final String? id;
+  // Add other relevant quest properties
+  Quest({this.id});
+}
+
+// 2. Failure Class Hierarchy (Simplified and Corrected)
+abstract class Failure {
+  final String message;
+  Failure({required this.message});
+}
+
+class LocationFailure extends Failure {
+  LocationFailure({required String message}) : super(message: message);
+}
+
+class ServerFailure extends Failure {
+  ServerFailure({String? message}) : super(message: message ?? 'Server Error');
+}
+
+class UnexpectedFailure extends Failure {
+  UnexpectedFailure({String? message})
+      : super(message: message ?? 'Unexpected Error');
+}
+
+// 3. UseCase Interface
+abstract class UseCase<Type, Params> {
+  Future<Either<Failure, Type>> call(Params params);
+}
+
+// 4. Define Parameters Class
 class SubmitLocationAnswerParams {
   final String questId;
   final double latitude;
   final double longitude;
 
-  SubmitLocationAnswerParams(
-      {required this.questId, required this.latitude, required this.longitude});
+  SubmitLocationAnswerParams({
+    required this.questId,
+    required this.latitude,
+    required this.longitude,
+  });
 }
 
+// 5. Define UseCase
 class SubmitLocationAnswerUseCase
-    implements ParamFutureUseCase<SubmitLocationAnswerParams, void> {
-  // Implement ParamFutureUseCase
+    implements UseCase<void, SubmitLocationAnswerParams> {
   final QuestRepository _questRepository;
 
   SubmitLocationAnswerUseCase({required QuestRepository questRepository})
@@ -26,21 +57,96 @@ class SubmitLocationAnswerUseCase
 
   @override
   Future<Either<Failure, void>> call(SubmitLocationAnswerParams params) async {
-    // Use call and Either
-    // Assuming submitCheckInLocation returns Future<Either<Failure, void>>
-    return await _questRepository.submitCheckInLocation(
-      params.questId,
-      params.latitude,
-      params.longitude,
-    );
+    try {
+      print(
+          'SubmitLocationAnswerUseCase: questId=${params.questId}, latitude=${params.latitude}, longitude=${params.longitude}'); // Add logging
+      await _questRepository.submitCheckInLocation(
+          params.questId, params.latitude, params.longitude);
+      print(
+          'SubmitLocationAnswerUseCase: Repository call successful'); // Add logging
+      return const Right(null);
+    } on Failure catch (failure) {
+      print(
+          'SubmitLocationAnswerUseCase: Failure: ${failure.message}'); // Add logging
+      return Left(failure);
+    } catch (e) {
+      print('SubmitLocationAnswerUseCase: Unexpected error: $e'); // Add logging
+      return Left(UnexpectedFailure(message: 'Unexpected error: $e'));
+    }
   }
 }
 
-//  QuestRepository provider (ensure this is defined correctly)
-final questRepositoryProvider = Provider<QuestRepository>((ref) {
-  throw UnimplementedError(); //  Implement this provider
-});
+// 6. Abstract Repository
+abstract class QuestRepository {
+  Future<void> submitCheckInLocation(
+      String questId, double latitude, double longitude);
+  // Add other repository methods as needed
+}
 
+// 7. *Mock* Repository Implementation
+class MockQuestRepository implements QuestRepository {
+  @override
+  Future<void> submitCheckInLocation(
+      String questId, double latitude, double longitude) async {
+    print(
+        'MockQuestRepository: questId=$questId, latitude=$latitude, longitude=$longitude'); // Add logging
+    // Simulate a successful submission
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Simulate errors based on input (for testing)
+    if (latitude == 0.0 && longitude == 0.0) {
+      print('MockQuestRepository: Throwing LocationFailure');
+      throw LocationFailure(message: 'Invalid coordinates');
+    }
+    if (questId == 'error_quest') {
+      print('MockQuestRepository: Throwing ServerFailure');
+      throw ServerFailure(message: 'Simulated server error');
+    }
+    print('MockQuestRepository: Success');
+    return Future.value(); // Return a completed Future<void>
+  }
+}
+
+// 8. Location Service (Simplified)
+class LocationService {
+  Future<Position> getCurrentLocation() async {
+    print('LocationService: getCurrentLocation called'); // Add logging
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print('LocationService: Location services are disabled');
+      throw LocationServiceDisabledException();
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        print('LocationService: Location permissions are denied');
+        throw PermissionDeniedException('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      print('LocationService: Location permissions are permanently denied');
+      throw LocationFailure(
+          message:
+              'Location permissions are permanently denied.'); // Changed to use LocationFailure
+    }
+    print('LocationService: Getting current position');
+    final position = await Geolocator.getCurrentPosition();
+    print('LocationService: Got position: $position');
+    return position;
+  }
+}
+
+// 9. Providers
+final locationServiceProvider =
+    Provider<LocationService>((ref) => LocationService());
+final questRepositoryProvider =
+    Provider<QuestRepository>((ref) => MockQuestRepository()); // Use Mock
 final submitLocationAnswerUseCaseProvider =
     Provider<SubmitLocationAnswerUseCase>(
   (ref) => SubmitLocationAnswerUseCase(
@@ -48,6 +154,7 @@ final submitLocationAnswerUseCaseProvider =
   ),
 );
 
+// 10. LocationCheckInQuestWidget
 class LocationCheckInQuestWidget extends ConsumerStatefulWidget {
   final Quest quest;
 
@@ -75,15 +182,26 @@ class _LocationCheckInQuestWidgetState
         _locationStatus = 'Location acquired!';
       });
     } catch (e) {
+      String errorMessage = 'Error getting location: $e';
+      if (e is LocationServiceDisabledException) {
+        errorMessage = 'Location services are disabled.';
+      } else if (e is PermissionDeniedException) {
+        errorMessage = 'Location permission denied.';
+      } else {
+        // Handle the general case
+        errorMessage = 'Error: ${e.toString()}';
+      }
       setState(() {
-        _locationStatus = 'Error getting location: $e';
+        _locationStatus = errorMessage;
       });
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final submitLocation = ref.read(submitLocationAnswerUseCaseProvider);
+  Widget build(BuildContext context) {
+    // Removed WidgetRef ref
+    final submitLocationUseCase =
+        ref.read(submitLocationAnswerUseCaseProvider); //Add this back
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,38 +220,41 @@ class _LocationCheckInQuestWidgetState
           ElevatedButton(
             onPressed: () async {
               try {
-                final result = await submitLocation.call(
-                  // Use call()
+                if (widget.quest.id == null) {
+                  //add null check
+                  _showError(
+                      context,
+                      UnexpectedFailure(
+                          message:
+                              'Quest ID is null.  Cannot submit location.'));
+                  return;
+                }
+                if (_currentPosition == null) {
+                  _showError(
+                      context,
+                      UnexpectedFailure(
+                          message:
+                              'Current position is null.  Cannot submit location.'));
+                  return;
+                }
+                final resultFuture = submitLocationUseCase(
                   SubmitLocationAnswerParams(
-                    questId: widget.quest.id,
+                    questId: widget.quest.id ?? '',
                     latitude: _currentPosition!.latitude,
                     longitude: _currentPosition!.longitude,
                   ),
-                );
+                ); // Store the Future
+                final result = await resultFuture; // Await it
                 result.fold(
-                  (failure) {
-                    // Handle failure (e.g., show error message)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: ${failure.message}'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  },
-                  (success) {
-                    // Handle success (e.g., show success message)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Location submitted!')),
-                    );
-                  },
+                  (failure) => _showError(context, failure),
+                  (success) => _showSuccess(context), //  use the result of fold
                 );
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('An unexpected error occurred: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                _showError(
+                    context,
+                    UnexpectedFailure(
+                        message:
+                            'Unexpected error: $e')); // Wrap in UnexpectedFailure
               }
             },
             child: const Text('Submit Location'),
@@ -141,8 +262,19 @@ class _LocationCheckInQuestWidgetState
       ],
     );
   }
-}
 
-// Ensure you have a LocationService provider defined, e.g.:
-final locationServiceProvider =
-    Provider<LocationService>((ref) => LocationService());
+  void _showError(BuildContext context, Failure failure) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: ${failure.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showSuccess(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Location submitted!')),
+    );
+  }
+}

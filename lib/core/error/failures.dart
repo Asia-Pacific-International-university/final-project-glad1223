@@ -1,49 +1,49 @@
 abstract class Failure {
   final String? message;
 
-  const Failure([this.message]);
+  Failure({required this.message}); // Constructor with named parameter
 }
 
 // General failures
 class ServerFailure extends Failure {
-  const ServerFailure([String? message]) : super(message);
+  ServerFailure({String? message}) : super(message: message);
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure([String? message]) : super(message);
+  CacheFailure({String? message}) : super(message: message);
 }
 
 // Specific failures (you can add more as needed)
 class UnauthorizedFailure extends ServerFailure {
-  const UnauthorizedFailure([String? message]) : super(message);
+  UnauthorizedFailure({String? message}) : super(message: message);
 }
 
 class NotFoundFailure extends ServerFailure {
-  const NotFoundFailure([String? message]) : super(message);
+  NotFoundFailure({String? message}) : super(message: message);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([String? message]) : super(message);
+  NetworkFailure({String? message}) : super(message: message);
 }
 
 // Example of a more specific cache failure
 class EmptyCacheFailure extends CacheFailure {
-  const EmptyCacheFailure([String? message]) : super(message);
+  EmptyCacheFailure({String? message}) : super(message: message);
 }
 
 // Add more specific failures as needed, e.g.,
 class InvalidInputFailure extends Failure {
-  const InvalidInputFailure([String? message]) : super(message);
+  InvalidInputFailure({String? message}) : super(message: message);
 }
 
 class QuestExpiredFailure extends Failure {
-  const QuestExpiredFailure([String? message]) : super(message);
+  QuestExpiredFailure({String? message}) : super(message: message);
 }
 
 class LocationPermissionDeniedFailure extends Failure {
-  const LocationPermissionDeniedFailure([String? message]) : super(message);
+  LocationPermissionDeniedFailure({String? message}) : super(message: message);
 }
 
 class CameraPermissionDeniedFailure extends Failure {
-  const CameraPermissionDeniedFailure([String? message]) : super(message);
+  CameraPermissionDeniedFailure({String? message}) : super(message: message);
 }
