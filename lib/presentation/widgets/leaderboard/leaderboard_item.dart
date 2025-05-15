@@ -11,8 +11,8 @@ class LeaderboardItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Text('$rank'),
-      title: Text(entry.facultyName),
-      trailing: Text('${entry.points} Points'),
+      title: Text(entry.userName ?? 'N/A'), // Use userName, handle null with ??
+      trailing: Text('${entry.score ?? 0} Points'), // Use score, null with ??
     );
   }
 }

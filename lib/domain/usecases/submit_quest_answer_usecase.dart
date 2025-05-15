@@ -1,11 +1,11 @@
 import 'package:final_project/core/usecases/usecase.dart';
 import 'package:final_project/domain/repositories/quest_repository.dart';
-import 'package:final_project/core/error/failures.dart'; // Likely needed for Either
+import 'package:final_project/core/error/failures.dart'; // Import your custom failure class
 import 'package:dartz/dartz.dart'; // Import Either
+import 'package:flutter/foundation.dart';
 
-abstract class SubmitQuestAnswerUseCase<Params>
-    implements
-        ParamFutureUseCase<Params, void> {} // Changed to ParamFutureUseCase
+abstract class SubmitQuestAnswerUseCase<Params, ReturnType>
+    implements ParamFutureUseCase<Params, ReturnType> {}
 
 class SubmitTriviaAnswerParams {
   final String questId;
@@ -15,20 +15,34 @@ class SubmitTriviaAnswerParams {
 }
 
 class SubmitTriviaAnswerUseCase
-    implements SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams> {
+    implements SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams, String> {
+  // Changed return type to String
   final QuestRepository _questRepository;
 
-  SubmitTriviaAnswerUseCase(
-      {required QuestRepository
-          questRepository}) // Corrected type and parameter name
-      : _questRepository = questRepository; // Initializer list
+  SubmitTriviaAnswerUseCase({required QuestRepository questRepository})
+      : _questRepository = questRepository;
 
   @override
-  Future<Either<Failure, void>> call(SubmitTriviaAnswerParams params) async {
-    // Changed execute to call and return type
-    final result = await _questRepository.submitTriviaAnswer(
-        params.questId, params.answer);
-    return result; // Assuming submitTriviaAnswer returns Either<Failure, void>
+  Future<Either<Failure, String>> call(SubmitTriviaAnswerParams params) async {
+    // Changed return type to String
+    try {
+      final result = await _questRepository.submitTriviaAnswer(
+          params.questId, params.answer);
+      // Check the result explicitly.
+      return result.fold(
+        (failure) => Left(failure),
+        (success) =>
+            Right(success), // Return the success value (which is a String)
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error in SubmitTriviaAnswerUseCase: $e");
+      }
+      // Construct a specific Failure, or wrap the exception.
+      return Left(UnexpectedFailure(
+          message:
+              'An unexpected error occurred: $e')); // Use the defined UnexpectedFailure
+    }
   }
 }
 

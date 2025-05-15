@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:final_project/presentation/providers/quest_provider.dart';
-import 'package:final_project/domain/entities/quest.dart';
+import 'package:final_project/domain/entities/quest.dart' as q;
 import 'package:final_project/presentation/widgets/quest/trivia_quest_widget.dart';
 import 'package:final_project/presentation/widgets/quest/location_checkin_quest_widget.dart';
 import 'package:final_project/presentation/widgets/quest/photo_challenge_quest_widget.dart';
-// Import other quest type widgets
+import 'package:final_project/presentation/adapters/location_checkin_quest_adapter.dart';
+import 'package:final_project/presentation/adapters/photo_challenge_quest_adapter.dart';
 
 class ActiveQuestScreen extends ConsumerWidget {
   const ActiveQuestScreen({super.key});
@@ -29,15 +30,14 @@ class ActiveQuestScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    quest.question ??
-                        quest.photoTheme ??
-                        quest.locationName ??
-                        'New Quest', // Display relevant title
-                    style: Theme.of(context).textTheme.headlineSmall),
+                  quest.title ??
+                      '', // Use null-aware operator to provide a default value
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 8),
-                Text(quest.description ?? ''),
+                Text(quest.description ?? 'No Description'),
                 const SizedBox(height: 16),
-                _buildQuestContent(quest, ref),
+                _buildQuestContent(quest, ref, context),
               ],
             ),
           );
@@ -49,25 +49,29 @@ class ActiveQuestScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuestContent(Quest? quest, WidgetRef ref) {
+  Widget _buildQuestContent(
+    q.Quest? quest,
+    WidgetRef ref,
+    BuildContext context,
+  ) {
     if (quest == null) {
       return const SizedBox.shrink();
     }
     switch (quest.type) {
-      case QuestType.trivia:
+      case q.QuestType.trivia:
         return TriviaQuestWidget(quest: quest);
-      case QuestType.poll:
-        return const Text(
-            'Quick Poll UI will be here'); // Implement QuickPollQuestWidget
-      case QuestType.locationCheckIn:
-        return LocationCheckInQuestWidget(quest: quest);
-      case QuestType.photoChallenge:
-        return PhotoChallengeQuestWidget(quest: quest);
-      case QuestType.miniPuzzle:
-        return const Text(
-            'Mini Puzzle UI will be here'); // Implement MiniPuzzleQuestWidget
+      case q.QuestType.poll:
+        return const Text('Quick Poll UI will be here');
+      case q.QuestType.locationCheckIn:
+        return LocationCheckInQuestWidget(
+            quest: LocationCheckInQuestAdapter(quest));
+      case q.QuestType.photoChallenge:
+        return PhotoChallengeQuestWidget(
+            quest: PhotoChallengeQuestAdapter(quest));
+      case q.QuestType.miniPuzzle:
+        return const Text('Mini Puzzle UI will be here');
       default:
-        return const Text('Unknown quest type');
+        return Text('Unknown quest type: ${quest.type}');
     }
   }
 }

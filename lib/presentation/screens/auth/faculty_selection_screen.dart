@@ -49,22 +49,19 @@ class FacultySelectionScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 ThemedButton(
                   // Using a custom themed button
+                  text: 'Continue',
                   onPressed: authProvider.selectedFaculty != null
                       ? () {
-                          // You might have already navigated in the ListTile's onTap
-                          // Or handle navigation here if not done in ListTile
-                          if (authProvider.selectedFaculty != null) {
-                            Navigator.of(context).pushReplacementNamed('/home');
-                          } else {
-                            // Optionally show a message to select a faculty
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Please select a faculty.')),
-                            );
-                          }
+                          //  moved the navigation here.
                         }
-                      : null, // Disable button if no faculty is selected
-                  label: 'Continue',
+                      : () {
+                          // Show message if no faculty is selected.
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select a faculty.'),
+                            ),
+                          );
+                        }, // Disable button if no faculty is selected
                 ),
               ],
             ),

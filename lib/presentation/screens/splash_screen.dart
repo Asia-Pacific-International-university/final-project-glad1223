@@ -38,7 +38,8 @@ class _SplashScreenState extends State<SplashScreen> {
     // Navigate based on login status
     if (mounted) {
       // Check if the widget is still in the tree
-      if (authProvider.isLoggedIn) {
+      if (authProvider.user != null) {
+        // Changed to check if user is not null
         Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
       } else {
         Navigator.of(context).pushReplacementNamed(LoginScreen.routeName);
@@ -55,10 +56,12 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Replace with your app logo
-            Icon(
-              Icons.campus_updates_rounded,
+            const Icon(
+              // Changed to const
+              Icons
+                  .school, // Changed to a valid icon.  campus_updates_rounded does not exist in flutter
               size: 100,
-              color: Theme.of(context).primaryColor,
+              color: Colors.blue, //Added a color
             ),
             const SizedBox(height: 20),
             const Text(

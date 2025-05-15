@@ -36,6 +36,10 @@ class InvalidInputFailure extends Failure {
   InvalidInputFailure({String? message}) : super(message: message);
 }
 
+class UnexpectedFailure extends Failure {
+  UnexpectedFailure({String? message}) : super(message: message);
+}
+
 class QuestExpiredFailure extends Failure {
   QuestExpiredFailure({String? message}) : super(message: message);
 }

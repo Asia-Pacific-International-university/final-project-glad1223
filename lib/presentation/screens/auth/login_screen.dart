@@ -65,10 +65,11 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 // App Logo Placeholder
-                Icon(
-                  Icons.campus_updates_rounded,
+                const Icon(
+                  // Removed the non-existent icon and used a standard one.
+                  Icons.school, // Using a more generic icon.
                   size: 80,
-                  color: Theme.of(context).primaryColor,
+                  color: Colors.blue, // You can change the color as needed.
                 ),
                 const SizedBox(height: 20),
                 Text(
@@ -125,8 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     }
                     return ThemedButton(
+                      // Corrected to use the text parameter.
+                      text: 'Login',
                       onPressed: () => _login(context),
-                      label: 'Login',
                     );
                   },
                 ),

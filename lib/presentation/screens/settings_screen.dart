@@ -16,7 +16,7 @@ class SettingsScreen extends StatelessWidget {
   // Function to handle logout
   Future<void> _logout(BuildContext context) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await authProvider.logout();
+    await authProvider.signOut(); // Corrected method name to signOut
     // Navigate back to login screen and remove all previous routes
     if (context.mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil(

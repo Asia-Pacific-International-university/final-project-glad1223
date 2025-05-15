@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:dartz/dartz.dart';
-//import 'package:final_project/core/error/failures.dart'; // Import Failure
-//import 'package:final_project/core/usecases/usecase.dart'; // Import UseCase
+import 'package:final_project/domain/entities/quest.dart'
+    as q; // Import the domain Quest
 
-// 1. Domain Entity (Simplified for this example)
-class Quest {
-  final String? id;
-  // Add other relevant quest properties
-  Quest({this.id});
-}
+// 1. Domain Entity (Use the domain Quest -  q.Quest)
+//class Quest {
+//  final String? id;
+//  // Add other relevant quest properties
+//  Quest({this.id});
+//}  REMOVED
 
 // 2. Failure Class (Ensure this is consistent)
 abstract class Failure {
@@ -39,7 +39,7 @@ abstract class UseCase<Type, Params> {
   Future<Either<Failure, Type>> call(Params params);
 }
 
-// 4.  ParamFutureUseCase Interface
+// 4.  ParamFutureUseCase Interface
 abstract class ParamFutureUseCase<Type, Params> {
   Future<Either<Failure, Type>> call(Params params);
 }
@@ -82,7 +82,7 @@ abstract class QuestRepository {
   // Add other repository methods as needed
 }
 
-// 8.  *Mock* Repository Implementation (for testing)
+// 8.  *Mock* Repository Implementation (for testing)
 class MockQuestRepository implements QuestRepository {
   @override
   Future<void> uploadPhoto(String questId, String imagePath) async {
@@ -91,7 +91,7 @@ class MockQuestRepository implements QuestRepository {
         const Duration(milliseconds: 500)); // Simulate network delay
 
     // In a real implementation, you'd handle actual upload logic and potential errors
-    //  (e.g., using try-catch and returning Left(Failure) on error).
+    //  (e.g., using try-catch and returning Left(Failure) on error).
 
     if (imagePath.contains('error')) {
       //Simulate error
@@ -111,10 +111,10 @@ class CameraService {
   }
 }
 
-// 10.  Providers
+// 10.  Providers
 final cameraServiceProvider = Provider<CameraService>((ref) => CameraService());
 
-// Use the MockQuestRepository here.  In your real app, you'd use your actual implementation.
+// Use the MockQuestRepository here.  In your real app, you'd use your actual implementation.
 final questRepositoryProvider =
     Provider<QuestRepository>((ref) => MockQuestRepository());
 
@@ -126,7 +126,7 @@ final submitPhotoAnswerUseCaseProvider = Provider<SubmitPhotoAnswerUseCase>(
 
 // 11. PhotoChallengeQuestWidget
 class PhotoChallengeQuestWidget extends ConsumerStatefulWidget {
-  final Quest quest;
+  final q.Quest quest; // Use the domain Quest
 
   const PhotoChallengeQuestWidget({super.key, required this.quest});
 
@@ -134,6 +134,18 @@ class PhotoChallengeQuestWidget extends ConsumerStatefulWidget {
   ConsumerState<PhotoChallengeQuestWidget> createState() =>
       _PhotoChallengeQuestWidgetState();
 }
+
+//class PhotoChallengeQuest extends q.Quest {  // Remove this
+//  final String? photoTheme;
+//
+//  PhotoChallengeQuest({
+//    required super.id,
+//    required super.type,
+//    required super.title,
+//    super.description,
+//    required this.photoTheme,
+//  });
+//}
 
 class _PhotoChallengeQuestWidgetState
     extends ConsumerState<PhotoChallengeQuestWidget> {
@@ -222,3 +234,25 @@ class _PhotoChallengeQuestWidgetState
     );
   }
 }
+
+//class PhotoChallengeQuestAdapter extends q.Quest {  // Removed Adapter
+//  final q.Quest _quest;
+//
+//  PhotoChallengeQuestAdapter(this._quest)
+//      : super(
+//          id: _quest.id,
+//          type: _quest.type,
+//          title: _quest.title,
+//          description: _quest.description,
+//          question: _quest.question,
+//          options: _quest.options,
+//          correctAnswer: _quest.correctAnswer,
+//          locationName: _quest.locationName,
+//          latitude: _quest.latitude,
+//          longitude: _quest.longitude,
+//          photoTheme: _quest.photoTheme, // Pass photoTheme
+//          timeLimitSeconds: _quest.timeLimitSeconds,
+//          startTime: _quest.startTime,
+//        );
+//  // Adapt any other properties needed by PhotoChallengeQuestWidget
+//}

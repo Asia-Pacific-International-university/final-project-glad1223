@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dartz/dartz.dart';
+import 'package:final_project/domain/entities/quest.dart'
+    as q; // Import the domain Quest
 
-// 1. Domain Entity (Simplified for this example)
-class Quest {
-  final String? id;
-  // Add other relevant quest properties
-  Quest({this.id});
-}
+// 1. Domain Entity (Use the domain Quest - q.Quest)
+// class Quest {
+//  final String? id;
+//  // Add other relevant quest properties
+//  Quest({this.id});
+//}  REMOVED
 
 // 2. Failure Class Hierarchy (Simplified and Corrected)
 abstract class Failure {
@@ -156,7 +158,7 @@ final submitLocationAnswerUseCaseProvider =
 
 // 10. LocationCheckInQuestWidget
 class LocationCheckInQuestWidget extends ConsumerStatefulWidget {
-  final Quest quest;
+  final q.Quest quest; // Use the domain Quest
 
   const LocationCheckInQuestWidget({super.key, required this.quest});
 
@@ -164,6 +166,18 @@ class LocationCheckInQuestWidget extends ConsumerStatefulWidget {
   ConsumerState<LocationCheckInQuestWidget> createState() =>
       _LocationCheckInQuestWidgetState();
 }
+
+// class LocationCheckInQuest extends q.Quest {  // Remove this
+//  final String locationName;
+//
+//  LocationCheckInQuest({
+//    required super.id,
+//    required super.type,
+//    required super.title,
+//    super.description,
+//    required this.locationName,
+//  });
+//}
 
 class _LocationCheckInQuestWidgetState
     extends ConsumerState<LocationCheckInQuestWidget> {
@@ -226,7 +240,7 @@ class _LocationCheckInQuestWidgetState
                       context,
                       UnexpectedFailure(
                           message:
-                              'Quest ID is null.  Cannot submit location.'));
+                              'Quest ID is null.  Cannot submit location.'));
                   return;
                 }
                 if (_currentPosition == null) {
@@ -234,7 +248,7 @@ class _LocationCheckInQuestWidgetState
                       context,
                       UnexpectedFailure(
                           message:
-                              'Current position is null.  Cannot submit location.'));
+                              'Current position is null.  Cannot submit location.'));
                   return;
                 }
                 final resultFuture = submitLocationUseCase(
@@ -247,7 +261,7 @@ class _LocationCheckInQuestWidgetState
                 final result = await resultFuture; // Await it
                 result.fold(
                   (failure) => _showError(context, failure),
-                  (success) => _showSuccess(context), //  use the result of fold
+                  (success) => _showSuccess(context), //  use the result of fold
                 );
               } catch (e) {
                 _showError(
@@ -278,3 +292,25 @@ class _LocationCheckInQuestWidgetState
     );
   }
 }
+
+// class LocationCheckInQuestAdapter extends q.Quest {  // Removed Adapter
+//  final q.Quest _quest;
+//
+//  LocationCheckInQuestAdapter(this._quest)
+//      : super(
+//          id: _quest.id,
+//          type: _quest.type,
+//          title: _quest.title,
+//          description: _quest.description,
+//          question: _quest.question,
+//          options: _quest.options,
+//          correctAnswer: _quest.correctAnswer,
+//          locationName: _quest.locationName, // Pass locationName
+//          latitude: _quest.latitude,
+//          longitude: _quest.longitude,
+//          photoTheme: _quest.photoTheme,
+//          timeLimitSeconds: _quest.timeLimitSeconds,
+//          startTime: _quest.startTime,
+//        );
+//  // Adapt any other properties needed by LocationCheckInQuestWidget
+//}

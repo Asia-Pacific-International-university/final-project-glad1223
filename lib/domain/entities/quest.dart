@@ -1,4 +1,5 @@
-import 'package:equatable/equatable.dart'; // Consider using equatable for easier object comparison
+// domain/entities/quest.dart
+import 'package:equatable/equatable.dart';
 
 enum QuestType {
   trivia,
@@ -11,19 +12,23 @@ enum QuestType {
 class Quest extends Equatable {
   final String? id;
   final QuestType? type;
-  final String? question; // For trivia, polls, puzzles
-  final List<String>? options; // For trivia, polls
-  final String? correctAnswer; // For trivia, puzzles
-  final String? locationName; // For location check-in
-  final double? latitude; // For location check-in
-  final double? longitude; // For location check-in
-  final String? photoTheme; // For photo challenge
+  final String? title;
+  final String? description;
+  final String? question;
+  final List<String>? options;
+  final String? correctAnswer;
+  final String? locationName;
+  final double? latitude;
+  final double? longitude;
+  final String? photoTheme;
   final int? timeLimitSeconds;
   final DateTime? startTime;
 
   Quest({
     this.id,
     this.type,
+    this.title,
+    this.description,
     this.question,
     this.options,
     this.correctAnswer,
@@ -39,6 +44,8 @@ class Quest extends Equatable {
   List<Object?> get props => [
         id,
         type,
+        title,
+        description,
         question,
         options,
         correctAnswer,

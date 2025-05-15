@@ -166,8 +166,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       return const Center(child: LoadingIndicator());
                     }
                     return ThemedButton(
+                      // Corrected to use text parameter
+                      text: 'Sign Up',
                       onPressed: () => _signup(context),
-                      label: 'Sign Up',
                     );
                   },
                 ),

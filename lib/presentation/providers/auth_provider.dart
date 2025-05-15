@@ -110,7 +110,8 @@ class AuthProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> checkAuthStatus() async {
+  Future<void> checkInitialAuthStatus() async {
+    // Changed method name
     final result = await _authRepository.getCurrentUser();
     result.fold(
       (failure) {
