@@ -5,7 +5,7 @@ import 'package:final_project/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
 class ProcessQuestSubmissionUseCase
-    implements ParamFutureUseCase<ProcessQuestSubmissionParams, void> {
+    implements ParamFutureUseCase<void, ProcessQuestSubmissionParams> {
   // Corrected implements clause
   final QuestRepository _questRepository;
   final UserRepositories _userRepository; // Example: to update user points
@@ -28,9 +28,15 @@ class ProcessQuestSubmissionUseCase
       (success) async {
         // Added async here
         // 2. If submission is successful, update user points (example)
-        // final updateResult = await _userRepository.addPoints(params.userId, params.pointsAwarded);
-        // return updateResult; // Assuming userRepository.addPoints returns Either<Failure, void>
-        return const Right(null); // Now returning a direct Either
+        try {
+          // added try-catch
+          final updateResult = await _userRepository.addPoints(
+              params.userId, params.pointsAwarded);
+          return updateResult; // Assuming userRepository.addPoints returns Either<Failure, void>
+        } catch (e) {
+          return Left(
+              ServerFailure('Failed to update points: $e')); // convert error.
+        }
       },
     );
   }

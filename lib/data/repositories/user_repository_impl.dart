@@ -23,7 +23,20 @@ class UserRepositoryImpl implements UserRepositories {
       return Right(userEntity);
     } catch (e) {
       // Handle different types of exceptions and map them to Failures
-      return Left(ServerFailure()); // Generic server failure for now
+      return Left(ServerFailure('Server error',
+          message: e.toString())); // Added positional argument
+    }
+  }
+
+  @override
+  Future<Either<Failure, User>> getUser(String userId) async {
+    try {
+      final userData = await _apiClient.get('/users/$userId');
+      final userModel = UserModel.fromJson(userData);
+      final userEntity = userModel.toDomain();
+      return Right(userEntity);
+    } catch (e) {
+      return Left(ServerFailure('Server error', message: e.toString()));
     }
   }
 

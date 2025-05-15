@@ -1,7 +1,7 @@
 abstract class Failure {
   final String? message;
 
-  Failure({required this.message}); // Constructor with named parameter
+  Failure({required this.message});
 }
 
 // General failures
@@ -15,11 +15,13 @@ class CacheFailure extends Failure {
 
 // Specific failures (you can add more as needed)
 class UnauthorizedFailure extends ServerFailure {
-  UnauthorizedFailure({String? message}) : super(message: message);
+  UnauthorizedFailure({String? message})
+      : super('Unauthorized', message: message); // Added ''
 }
 
 class NotFoundFailure extends ServerFailure {
-  NotFoundFailure({String? message}) : super(message: message);
+  NotFoundFailure({String? message})
+      : super('Not Found', message: message); // Added ''
 }
 
 class NetworkFailure extends Failure {

@@ -30,7 +30,7 @@ class SubmitTriviaAnswerUseCase
       : _questRepository = questRepository;
 
   @override
-  Future<Either<Failure, String>> call(SubmitTriviaAnswerParams params) async {
+  Future<Either<Failure, String>?> call(SubmitTriviaAnswerParams params) async {
     // Changed return type to String
     try {
       final result = await _questRepository.submitTriviaAnswer(

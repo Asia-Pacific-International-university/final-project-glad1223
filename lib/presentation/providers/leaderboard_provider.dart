@@ -1,85 +1,23 @@
+// lib/presentation/providers/leaderboard_provider.dart
 import 'package:flutter/material.dart';
-import '../../domain/entities/leaderboard_entry.dart'; // Assuming an entity for leaderboard entries
-import '../../domain/repositories/leaderboard_repositories.dart'; // Assuming a LeaderboardRepository
+import 'package:final_project/main.dart'; // Import getIt
+import '../../domain/repositories/leaderboard_repositories.dart'; // Corrected import
+import '../../domain/entities/leaderboard_entry.dart';
 import '../../core/error/failures.dart';
+import 'package:dartz/dartz.dart';
 
 class LeaderboardProvider extends ChangeNotifier {
-  final LeaderboardRepository _leaderboardRepository;
+  final LeaderboardRepositories _leaderboardRepository; // Use the interface
 
-  LeaderboardProvider(this._leaderboardRepository) {
-    _listenToLeaderboard();
-  }
+  LeaderboardProvider(
+      {required LeaderboardRepositories
+          leaderboardRepository}) // Corrected constructor
+      : _leaderboardRepository = leaderboardRepository;
 
-  List<LeaderboardEntry> _leaderboardList = [];
-  List<LeaderboardEntry> get leaderboardList => _leaderboardList;
+  Stream<Either<Failure, List<LeaderboardEntry>>> get leaderboardStream =>
+      _leaderboardRepository.getLeaderboardStream();
 
-  bool _isLoading = false;
-  bool get isLoading => _isLoading;
-
-  String _errorMessage = '';
-  String get errorMessage => _errorMessage;
-
-  Stream<Either<Failure, List<LeaderboardEntry>>>? _leaderboardStream;
-
-  void _listenToLeaderboard() {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
-
-    _leaderboardStream = _leaderboardRepository.getLeaderboardStream();
-    _leaderboardStream?.listen((result) {
-      result.fold(
-        (failure) {
-          _isLoading = false;
-          _errorMessage = _mapFailureToMessage(failure);
-          _leaderboardList = [];
-          notifyListeners();
-        },
-        (leaderboardEntries) {
-          _isLoading = false;
-          _leaderboardList = leaderboardEntries;
-          notifyListeners();
-        },
-      );
-    });
-  }
-
-  // Method to manually refresh the leaderboard (if needed)
-  Future<void> refreshLeaderboard() async {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
-
-    final result = await _leaderboardRepository
-        .fetchLeaderboard(); // Assuming a fetch method
-    result.fold(
-      (failure) {
-        _isLoading = false;
-        _errorMessage = _mapFailureToMessage(failure);
-        notifyListeners();
-      },
-      (leaderboardEntries) {
-        _isLoading = false;
-        _leaderboardList = leaderboardEntries;
-        notifyListeners();
-      },
-    );
-  }
-
-  String _mapFailureToMessage(Failure failure) {
-    switch (failure.runtimeType) {
-      case ServerFailure:
-        return 'Failed to fetch leaderboard data from the server.';
-      case CacheFailure:
-        return 'Failed to load leaderboard data from cache.';
-      default:
-        return 'An unexpected error occurred while loading leaderboard data.';
-    }
-  }
-
-  @override
-  void dispose() {
-    // Cancel any ongoing stream subscriptions if necessary
-    super.dispose();
+  Future<Either<Failure, List<LeaderboardEntry>>> fetchLeaderboard() async {
+    return await _leaderboardRepository.fetchLeaderboard();
   }
 }

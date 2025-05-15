@@ -1,13 +1,12 @@
 // *** lib/domain/usecases/sign_in_usecase.dart ***
 import 'package:dartz/dartz.dart';
-import 'package:final_project/presentation/widgets/quest/location_checkin_quest_widget.dart'
-    as lcqw; // Added prefix 'lcqw'
 import '../entities/user.dart';
 import '../repositories/auth_repository.dart';
 import '../../core/error/failures.dart'; // Keep this import
 import '../../core/usecases/usecase.dart';
 
-class SignInUseCase implements UseCase<User, SignInParams> {
+class SignInUseCase implements UseCase<SignInParams, User> {
+  // Corrected implements clause
   final AuthRepository repository;
 
   SignInUseCase(this.repository);
