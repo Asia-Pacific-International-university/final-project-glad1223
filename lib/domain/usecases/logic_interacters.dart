@@ -41,20 +41,18 @@ class ProcessQuestSubmissionUseCase
         params.questId, params.answer);
 
     // 2. Handle the result of the submission and potential points update
-    return await submissionResult.fold<Future<Either<Failure, void>>>(
-      // Explicit Future
-      (failure) {
-        return Future<Either<Failure, void>>.value(Left(failure));
-      },
+    return await submissionResult.fold(
+      (failure) => Future.value(Left(failure)), // Use a simple return
       (success) async {
+        // success is void, so we proceed
         try {
           final updateResult = await _userRepository.addPoints(
               params.userId, params.pointsAwarded);
-          return updateResult;
+          return updateResult; // Return the result of addPoints
         } on Failure catch (failure) {
-          return Future<Either<Failure, void>>.value(Left(failure));
+          return Future.value(Left(failure));
         } catch (e) {
-          return Future<Either<Failure, void>>.value(
+          return Future.value(
               Left(ServerFailure('Failed to update points: $e')));
         }
       },
