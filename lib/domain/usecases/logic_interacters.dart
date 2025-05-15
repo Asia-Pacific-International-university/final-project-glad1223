@@ -25,8 +25,8 @@ class ProcessQuestSubmissionUseCase
         params.questId, params.answer);
     return submissionResult.fold(
       (failure) => Left(failure),
-      (success) {
-        // Remove the 'async' keyword here
+      (success) async {
+        // Added async here
         // 2. If submission is successful, update user points (example)
         // final updateResult = await _userRepository.addPoints(params.userId, params.pointsAwarded);
         // return updateResult; // Assuming userRepository.addPoints returns Either<Failure, void>

@@ -1,8 +1,13 @@
-import 'package:final_project/core/usecases/usecase.dart';
+//import 'package:final_project/core/usecases/usecase.dart';
 import 'package:final_project/domain/repositories/quest_repository.dart';
 import 'package:final_project/core/error/failures.dart'; // Import your custom failure class
 import 'package:dartz/dartz.dart'; // Import Either
 import 'package:flutter/foundation.dart';
+
+// Assuming this is the definition of ParamFutureUseCase
+abstract class ParamFutureUseCase<Params, ReturnType> {
+  Future<ReturnType> call(Params params);
+}
 
 abstract class SubmitQuestAnswerUseCase<Params, ReturnType>
     implements ParamFutureUseCase<Params, ReturnType> {}
@@ -15,7 +20,9 @@ class SubmitTriviaAnswerParams {
 }
 
 class SubmitTriviaAnswerUseCase
-    implements SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams, String> {
+    implements
+        SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams,
+            Either<Failure, String>> {
   // Changed return type to String
   final QuestRepository _questRepository;
 
@@ -29,11 +36,7 @@ class SubmitTriviaAnswerUseCase
       final result = await _questRepository.submitTriviaAnswer(
           params.questId, params.answer);
       // Check the result explicitly.
-      return result.fold(
-        (failure) => Left(failure),
-        (success) =>
-            Right(success), // Return the success value (which is a String)
-      );
+      return result;
     } catch (e) {
       if (kDebugMode) {
         print("Error in SubmitTriviaAnswerUseCase: $e");
@@ -45,5 +48,3 @@ class SubmitTriviaAnswerUseCase
     }
   }
 }
-
-// Similar Params and UseCase implementations for other quest types (Poll, Location, Photo)

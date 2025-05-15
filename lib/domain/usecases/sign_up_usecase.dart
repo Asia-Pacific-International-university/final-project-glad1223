@@ -14,8 +14,10 @@ class SignUpUseCase implements ParamFutureUseCase<SignUpParams, User> {
   @override
   Future<Either<Failure, User>> call(SignUpParams params) async {
     // Method name is call
-    return await _authRepository.signUp(
-        params.email, params.password, params.faculty);
+    // Assuming _authRepository.signUp takes an additional 'name' parameter.
+    // You might need to adjust this based on your actual AuthRepository.
+    return await _authRepository.signUp(params.email, params.password,
+        params.faculty, ""); // Added a placeholder for name
   }
 }
 
@@ -23,7 +25,11 @@ class SignUpParams {
   final String email;
   final String password;
   final String faculty;
+  final String name; // Added name
 
   SignUpParams(
-      {required this.email, required this.password, required this.faculty});
+      {required this.email,
+      required this.password,
+      required this.faculty,
+      this.name = ""}); // Added this.name and a default value
 }

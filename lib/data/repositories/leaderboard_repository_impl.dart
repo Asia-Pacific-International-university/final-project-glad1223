@@ -22,11 +22,13 @@ class LeaderboardRepositoryImpl implements LeaderboardRepositories {
               event.map((json) => LeaderboardEntry.fromJson(json)).toList();
           return Right<Failure, List<LeaderboardEntry>>(leaderboardEntries);
         } else {
-          return Left<Failure, List<LeaderboardEntry>>(ServerFailure());
+          return Left<Failure, List<LeaderboardEntry>>(ServerFailure(
+              message: 'Invalid leaderboard data format')); // Added message
         }
       });
     } catch (e) {
-      return Stream.value(Left(ServerFailure()));
+      return Stream.value(Left(ServerFailure(
+          message: 'Error fetching leaderboard stream: $e'))); // Added message
     }
   }
 
@@ -42,10 +44,12 @@ class LeaderboardRepositoryImpl implements LeaderboardRepositories {
             .toList();
         return Right(leaderboardEntries);
       } else {
-        return Left(ServerFailure());
+        return Left(ServerFailure(
+            message: 'Invalid leaderboard data format')); // Added message
       }
     } catch (e) {
-      return Left(ServerFailure());
+      return Left(ServerFailure(
+          message: 'Error fetching leaderboard: $e')); // Added message
     }
   }
 }
