@@ -23,8 +23,8 @@ class UserRepositoryImpl implements UserRepositories {
       return Right(userEntity);
     } catch (e) {
       // Handle different types of exceptions and map them to Failures
-      return Left(ServerFailure('Server error',
-          message: e.toString())); // Added positional argument
+      return Left(ServerFailure(
+          'Server error: ${e.toString()}')); // Corrected: Passing message as positional argument
     }
   }
 
@@ -36,7 +36,8 @@ class UserRepositoryImpl implements UserRepositories {
       final userEntity = userModel.toDomain();
       return Right(userEntity);
     } catch (e) {
-      return Left(ServerFailure('Server error', message: e.toString()));
+      return Left(ServerFailure(
+          'Server error: ${e.toString()}')); // Corrected: Passing message as positional argument
     }
   }
 

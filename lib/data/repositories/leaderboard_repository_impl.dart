@@ -1,3 +1,116 @@
+// import 'package:dartz/dartz.dart';
+// import '../../domain/entities/leaderboard_entry.dart';
+// import '../../domain/repositories/leaderboard_repositories.dart';
+// import '../../core/error/failures.dart';
+// import '../datasources/remote/api_client.dart'; // Assuming you have an ApiClient
+// //import '../models/leaderboard_model.dart'; // Assuming you have a LeaderboardModel (or directly use List<LeaderboardEntry>)
+
+// class LeaderboardRepositoryImpl implements LeaderboardRepositories {
+//   final ApiClient _apiClient;
+
+//   LeaderboardRepositoryImpl(this._apiClient);
+
+//   // Assuming your API provides a stream of leaderboard data (e.g., using WebSockets)
+//   @override
+//   Stream<Either<Failure, List<LeaderboardEntry>>> getLeaderboardStream() {
+//     try {
+//       // Replace with your actual stream implementation
+//       return _apiClient.getLeaderboardStream('/leaderboard').map((event) {
+//         // Assuming the event contains a list of leaderboard data
+//         if (event is List) {
+//           final leaderboardEntries =
+//               event.map((json) => LeaderboardEntry.fromJson(json)).toList();
+//           return Right<Failure, List<LeaderboardEntry>>(leaderboardEntries);
+//         } else {
+//           return Left<Failure, List<LeaderboardEntry>>(
+//               ServerFailure('Invalid data', // Added a positional argument
+//                   message: 'Invalid leaderboard data format')); // Added message
+//         }
+//       });
+//     } catch (e) {
+//       return Stream.value(Left(ServerFailure(
+//           'Stream error', // Added a positional argument
+//           message: 'Error fetching leaderboard stream: $e'))); // Added message
+//     }
+//   }
+
+//   @override
+//   Future<Either<Failure, List<LeaderboardEntry>>> fetchLeaderboard() async {
+//     try {
+//       final leaderboardData = await _apiClient
+//           .get('/leaderboard'); // Replace with your API endpoint
+//       if (leaderboardData is List) {
+//         final leaderboardEntries = (leaderboardData as List<dynamic>)
+//             .map((json) =>
+//                 LeaderboardEntry.fromJson(json as Map<String, dynamic>))
+//             .toList();
+//         return Right(leaderboardEntries);
+//       } else {
+//         return Left(ServerFailure('Invalid data', // Added a positional argument
+//             message: 'Invalid leaderboard data format')); // Added message
+//       }
+//     } catch (e) {
+//       return Left(ServerFailure('Fetch error', // Added a positional argument
+//           message: 'Error fetching leaderboard: $e')); // Added message
+//     }
+//   }
+// }
+////////.......
+// import 'package:dartz/dartz.dart';
+// import '../../domain/entities/leaderboard_entry.dart';
+// import '../../domain/repositories/leaderboard_repositories.dart';
+// import '../../core/error/failures.dart';
+// import '../datasources/remote/api_client.dart'; // Assuming you have an ApiClient
+// //import '../models/leaderboard_model.dart'; // Assuming you have a LeaderboardModel (or directly use List<LeaderboardEntry>)
+
+// class LeaderboardRepositoryImpl implements LeaderboardRepositories {
+//   final ApiClient _apiClient;
+
+//   LeaderboardRepositoryImpl(this._apiClient);
+
+//   // Assuming your API provides a stream of leaderboard data (e.g., using WebSockets)
+//   @override
+//   Stream<Either>Failure, List<LeaderboardEntry>>>> getLeaderboardStream() {
+//     try {
+//       // Replace with your actual stream implementation
+//       return _apiClient.getLeaderboardStream('/leaderboard').map((event) {
+//         // Assuming the event contains a list of leaderboard data
+//         if (event is List) {
+//           final leaderboardEntries =
+//               (event as List<dynamic>).map((json) => LeaderboardEntry.fromJson(json as Map<String, dynamic>)).toList();
+//           return Right<Failure, List<LeaderboardEntry>>(leaderboardEntries);
+//         } else {
+//           return Left<Failure, List<LeaderboardEntry>>(
+//             ServerFailure('Invalid data: Invalid leaderboard data format'), // Corrected: Single positional argument
+//           );
+//         }
+//       });
+//     } catch (e) {
+//       return Stream.value(Left(ServerFailure('Stream error: Error fetching leaderboard stream: $e'))); // Corrected: Single positional argument
+//     }
+//   }
+
+//   @override
+//   Future<Either<Failure, List<LeaderboardEntry>>>> fetchLeaderboard() async {
+//     try {
+//       final leaderboardData = await _apiClient
+//           .get('/leaderboard'); // Replace with your API endpoint
+//       if (leaderboardData is List) {
+//         final leaderboardEntries = (leaderboardData as List<dynamic>)
+//             .map((json) =>
+//                 LeaderboardEntry.fromJson(json as Map<String, dynamic>))
+//             .toList();
+//         return Right(leaderboardEntries);
+//       } else {
+//         return Left(ServerFailure('Invalid data: Invalid leaderboard data format')); // Corrected: Single positional argument
+//       }
+//     } catch (e) {
+//       return Left(ServerFailure('Fetch error: Error fetching leaderboard: $e')); // Corrected: Single positional argument
+//     }
+//   }
+// } 
+
+
 import 'package:dartz/dartz.dart';
 import '../../domain/entities/leaderboard_entry.dart';
 import '../../domain/repositories/leaderboard_repositories.dart';
@@ -12,30 +125,28 @@ class LeaderboardRepositoryImpl implements LeaderboardRepositories {
 
   // Assuming your API provides a stream of leaderboard data (e.g., using WebSockets)
   @override
-  Stream<Either<Failure, List<LeaderboardEntry>>> getLeaderboardStream() {
+  Stream<Either<Failure, List<LeaderboardEntry>>>> getLeaderboardStream() {
     try {
       // Replace with your actual stream implementation
       return _apiClient.getLeaderboardStream('/leaderboard').map((event) {
         // Assuming the event contains a list of leaderboard data
         if (event is List) {
           final leaderboardEntries =
-              event.map((json) => LeaderboardEntry.fromJson(json)).toList();
+              (event as List<dynamic>).map((json) => LeaderboardEntry.fromJson(json as Map<String, dynamic>)).toList();
           return Right<Failure, List<LeaderboardEntry>>(leaderboardEntries);
         } else {
           return Left<Failure, List<LeaderboardEntry>>(
-              ServerFailure('Invalid data', // Added a positional argument
-                  message: 'Invalid leaderboard data format')); // Added message
+            ServerFailure('Invalid data: Invalid leaderboard data format'), // Corrected: Single positional argument
+          );
         }
       });
     } catch (e) {
-      return Stream.value(Left(ServerFailure(
-          'Stream error', // Added a positional argument
-          message: 'Error fetching leaderboard stream: $e'))); // Added message
+      return Stream.value(Left(ServerFailure('Stream error: Error fetching leaderboard stream: $e'))); // Corrected: Single positional argument
     }
   }
 
   @override
-  Future<Either<Failure, List<LeaderboardEntry>>> fetchLeaderboard() async {
+  Future<Either<Failure, List<LeaderboardEntry>>>> fetchLeaderboard() async {
     try {
       final leaderboardData = await _apiClient
           .get('/leaderboard'); // Replace with your API endpoint
@@ -46,12 +157,10 @@ class LeaderboardRepositoryImpl implements LeaderboardRepositories {
             .toList();
         return Right(leaderboardEntries);
       } else {
-        return Left(ServerFailure('Invalid data', // Added a positional argument
-            message: 'Invalid leaderboard data format')); // Added message
+        return Left(ServerFailure('Invalid data: Invalid leaderboard data format')); // Corrected: Single positional argument
       }
     } catch (e) {
-      return Left(ServerFailure('Fetch error', // Added a positional argument
-          message: 'Error fetching leaderboard: $e')); // Added message
+      return Left(ServerFailure('Fetch error: Error fetching leaderboard: $e')); // Corrected: Single positional argument
     }
   }
 }

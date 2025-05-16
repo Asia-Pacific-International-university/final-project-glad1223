@@ -1,11 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:final_project/presentation/providers/profile_provider.dart'; // Path to your provider
-import 'package:final_project/presentation/widgets/common/loading_indicator.dart'; // Assuming this exists
-import 'package:final_project/domain/entities/user.dart'; // Import the User class
+import 'package:final_project/presentation/providers/profile_provider.dart';
+import 'package:final_project/presentation/widgets/common/loading_indicator.dart';
+import 'package:final_project/domain/entities/user.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // You'll likely need the userId here. How are you accessing it?
+    // For example, if it's passed as an argument to the screen:
+    // final userId = ModalRoute.of(context)!.settings.arguments as String;
+    // Or if it's stored in your AuthProvider:
+    // final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // final userId = authProvider.userId; // Assuming you have this
+
+    // Replace 'someUserId' with how you get the actual user ID
+    Provider.of<ProfileProvider>(context, listen: false)
+        .getUserProfile('someUserId');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,8 +34,7 @@ class ProfileScreen extends StatelessWidget {
       body: Consumer<ProfileProvider>(
         builder: (context, profileProvider, child) {
           if (profileProvider.isLoading) {
-            return const Center(
-                child: LoadingIndicator()); // Using your loading indicator
+            return const Center(child: LoadingIndicator());
           } else if (profileProvider.errorMessage.isNotEmpty) {
             return Center(
                 child: Text('Error: ${profileProvider.errorMessage}'));
@@ -23,8 +42,7 @@ class ProfileScreen extends StatelessWidget {
             return const Center(
                 child: Text('Could not load profile information.'));
           } else {
-            final User user =
-                profileProvider.user!; // Non-null assertion since we checked
+            final User user = profileProvider.user!;
 
             return Padding(
               padding: const EdgeInsets.all(16.0),
@@ -34,7 +52,6 @@ class ProfileScreen extends StatelessWidget {
                   const Center(
                     child: CircleAvatar(
                       radius: 60,
-                      // You'll likely load the user's avatar here based on user data
                       child: Icon(Icons.person, size: 60),
                     ),
                   ),
@@ -52,16 +69,14 @@ class ProfileScreen extends StatelessWidget {
                   const Text('Faculty:',
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text(user.faculty ?? 'N/A', // Use null-aware operator here
+                  Text(user.faculty ?? 'N/A',
                       style: const TextStyle(fontSize: 18)),
                   const SizedBox(height: 12),
                   const Text('Score:',
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   Text(user.totalPoints.toString(),
-                      style: const TextStyle(
-                          fontSize:
-                              18)), // Access score directly and convert to String
+                      style: const TextStyle(fontSize: 18)),
                   // Add more profile information as needed
                 ],
               ),
