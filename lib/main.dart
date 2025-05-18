@@ -32,6 +32,7 @@ void setupDependencies() {
   // Register your remote data source
   getIt.registerLazySingleton<AuthRemoteDataSource>(
     () => auth_remote_impl.AuthRemoteDataSourceImpl(getIt<ApiClient>()),
+    //getIt.registerLazySingleton<ApiClient>(() => ApiClient(/* any required parameters */));
   );
 
   // Register your repositories
@@ -70,7 +71,7 @@ void setupDependencies() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  //await Firebase.initializeApp();
 
   setupDependencies();
 
