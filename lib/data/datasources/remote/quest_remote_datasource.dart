@@ -1,12 +1,12 @@
-import 'package:final_project/data/models/quest_model.dart';
+import 'package:final_project/data/models/quest_model.dart'; // Ensure this import is correct
 
 abstract class QuestRemoteDataSource {
   Future<QuestModel?> getActiveQuest();
-  Future<void> submitTriviaAnswer(String questId, String answer);
+  Future<String> submitTriviaAnswer(
+      String questId, String answer); // Changed to Future<String>
   Future<void> submitPollVote(String questId, String optionId);
   Future<void> submitCheckInLocation(
       String questId, double latitude, double longitude);
-  Future<String> uploadPhoto(
-      String questId, String imagePath); // Returns URL or identifier
-  // Add methods for other quest types as needed
+  Future<String> uploadPhoto(String questId, String imagePath);
+  // Add other quest type submission methods if needed
 }

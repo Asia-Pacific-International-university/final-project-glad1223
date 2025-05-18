@@ -1,30 +1,27 @@
-//import 'package:final_project/core/usecases/usecase.dart'; // Assuming NoParamFutureUseCase is defined here
+// lib/domain/usecases/get_active_quest_usecase.dart
 import 'package:final_project/domain/entities/quest.dart';
 import 'package:final_project/domain/repositories/quest_repository.dart';
-import 'package:dartz/dartz.dart'; // Import dartz
-import 'package:final_project/core/error/failures.dart'; // Import your Failure class
+import 'package:dartz/dartz.dart';
+import 'package:final_project/core/error/failures.dart';
 
-// *** lib/core/usecases/usecase.dart ***
-abstract class NoParamStreamUseCase<T> {
-  Stream<T> call();
-}
+// Assuming your NoParamFutureUseCase is defined as:
+// abstract class NoParamFutureUseCase<T> {
+//   Future<T> call(); // The T here is the direct success type or the Either itself
+// }
+// For consistency with how ParamFutureUseCase is defined (returning Either),
+// let's adjust NoParamFutureUseCase if needed, or how GetActiveQuestUseCase implements it.
 
+// Your current abstract class (from the snippet):
 abstract class NoParamFutureUseCase<T> {
   Future<T> call();
 }
 
-abstract class ParamFutureUseCase<Params, Result> {
-  Future<Either<Failure, Result>> call(Params params);
-}
+// GetActiveQuestUseCase is trying to implement NoParamFutureUseCase<Either<Failure, Quest>>
+// This means its call() method should return Future<Either<Failure, Quest>>.
 
-abstract class ParamStreamUseCase<Params, Result> {
-  Stream<Either<Failure, Result>> call(Params params);
-}
-
-// *** lib/domain/usecases/get_active_quest_usecase.dart
 class GetActiveQuestUseCase
     implements NoParamFutureUseCase<Either<Failure, Quest>> {
-  // Change return type
+  // Return type of call() is Future<Either<Failure, Quest>>
   final QuestRepository _questRepository;
 
   GetActiveQuestUseCase({required QuestRepository questRepository})
@@ -32,18 +29,33 @@ class GetActiveQuestUseCase
 
   @override
   Future<Either<Failure, Quest>> call() async {
-    try {
-      final Quest? quest = await _questRepository.getActiveQuest();
-      if (quest == null) {
-        return Left(NotFoundFailure(
-            message: 'No active quest found.')); // Handle null from repository
-      }
-      return Right(quest);
-    } on Failure catch (e) {
-      return Left(e); // Return the Failure directly
-    } catch (e) {
-      return Left(UnexpectedFailure(
-          message: 'Unexpected error: $e')); // Catch other errors
-    }
+    // Matches the interface
+    // _questRepository.getActiveQuest() returns Future<Either<Failure, Quest?>>
+    final eitherResult = await _questRepository.getActiveQuest();
+
+    // Use fold to handle the Either<Failure, Quest?>
+    return eitherResult.fold(
+      (failure) {
+        // If _questRepository.getActiveQuest() returned a Left(failure)
+        return Left(failure);
+      },
+      (questOrNull) {
+        // If _questRepository.getActiveQuest() returned a Right(questOrNull)
+        if (questOrNull == null) {
+          // If the quest is null, we treat it as a NotFoundFailure as per your original logic.
+          // This transforms Either<Failure, Quest?> into Either<Failure, Quest>
+          // where a null Quest on success becomes a specific Failure.
+          return Left(NotFoundFailure(message: 'No active quest found.'));
+        } else {
+          // If questOrNull is not null, then it's a valid Quest.
+          return Right(questOrNull);
+        }
+      },
+    );
   }
 }
+
+// Ensure NotFoundFailure is defined in your failures.dart, e.g.:
+// class NotFoundFailure extends Failure {
+//   NotFoundFailure({required String message}) : super(message);
+// }

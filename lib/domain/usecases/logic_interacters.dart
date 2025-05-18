@@ -27,10 +27,10 @@ class ProcessQuestSubmissionUseCase
   final QuestRepository _questRepository;
   final UserRepositories _userRepository;
 
-  ProcessQuestSubmissionUseCase(
-      {required QuestRepository questRepository,
-      required UserRepositories userRepository})
-      : _questRepository = questRepository,
+  ProcessQuestSubmissionUseCase({
+    required QuestRepository questRepository,
+    required UserRepositories userRepository,
+  })  : _questRepository = questRepository,
         _userRepository = userRepository;
 
   @override
@@ -42,19 +42,13 @@ class ProcessQuestSubmissionUseCase
 
     // 2. Handle the result of the submission and potential points update
     return await submissionResult.fold(
-      (failure) => Future.value(Left(failure)), // Use a simple return
-      (success) async {
-        // success is void, so we proceed
-        try {
-          final updateResult = await _userRepository.addPoints(
-              params.userId, params.pointsAwarded);
-          return updateResult; // Return the result of addPoints
-        } on Failure catch (failure) {
-          return Future.value(Left(failure));
-        } catch (e) {
-          return Future.value(
-              Left(ServerFailure('Failed to update points: $e')));
-        }
+      (failure) => Left(failure),
+      (_) async {
+        // Use _ to indicate you don't need the String value
+        // Submission was successful (we don't need the String outcome here)
+        final pointsAddedResult = await _userRepository.addPoints(
+            params.userId, params.pointsAwarded);
+        return pointsAddedResult; // This is Future<Either<Failure, void>>
       },
     );
   }
