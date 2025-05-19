@@ -37,10 +37,30 @@ class ProfileProvider extends ChangeNotifier {
       },
       (user) {
         _user = user;
+        _awardInitialBadges(); // Award badges after loading the user
         _isLoading = false;
         notifyListeners();
       },
     );
+  }
+
+  // Simple logic to award initial badges based on total points
+  void _awardInitialBadges() {
+    if (_user != null) {
+      final badges = <String>[];
+      if (_user!.totalPoints >= 10) {
+        badges.add('Good Job. Beginner Badge');
+      }
+      if (_user!.totalPoints >= 50) {
+        badges.add('Great Job. Master Badge');
+      }
+      if (_user!.totalPoints >= 100) {
+        badges.add('Best Job. Pro Badge');
+      }
+      _user = _user!.copyWith(badges: badges);
+      notifyListeners();
+      // In a real app, you would likely persist these badge updates.
+    }
   }
 
   // Add other profile-related methods here (e.g., updateProfile)

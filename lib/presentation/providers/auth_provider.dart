@@ -1,23 +1,21 @@
-// *** File: lib/presentation/providers/auth_provider.dart ***
+// *** lib/presentation/providers/auth_provider.dart ***
 import 'package:flutter/material.dart';
-import 'package:dartz/dartz.dart'; // For Either
+import 'package:dartz/dartz.dart';
 import '../../domain/usecases/sign_up_usecase.dart';
-import '../../domain/usecases/sign_in_usecase.dart'; // Assuming you have this
+import '../../domain/usecases/sign_in_usecase.dart';
 import '../../domain/entities/user.dart';
 import '../../core/error/failures.dart';
-import '../../core/constants/app_constants.dart'; // Import role enum
-import '../../data/models/user_model.dart'; // Import UserModel for placeholder
-import '../../domain/usecases/update_user_faculty_usecase.dart'; // Import the update faculty use case
-import '../../domain/repositories/auth_repository.dart'; // Import AuthRepository for signOut and getCurrentUser
+import '../../core/constants/app_constants.dart';
+import '../../domain/usecases/update_user_faculty_usecase.dart';
+import '../../domain/repositories/auth_repository.dart';
 
 class AuthProvider with ChangeNotifier {
   final SignUpUseCase _signUpUseCase;
-  final SignInUseCase _signInUseCase; // Use this for logging in existing users
-  final UpdateUserFacultyUseCase _updateUserFacultyUseCase; // New use case
-  final AuthRepository
-      _authRepository; // Add AuthRepository for signOut and getCurrentUser
+  final SignInUseCase _signInUseCase;
+  final UpdateUserFacultyUseCase _updateUserFacultyUseCase;
+  final AuthRepository _authRepository;
 
-  User? _currentUser; // Store the currently logged-in user
+  User? _currentUser;
   User? get currentUser => _currentUser;
 
   bool _isLoading = false;
@@ -36,9 +34,8 @@ class AuthProvider with ChangeNotifier {
   AuthProvider({
     required SignUpUseCase signUpUseCase,
     required SignInUseCase signInUseCase,
-    required UpdateUserFacultyUseCase
-        updateUserFacultyUseCase, // Inject the new use case
-    required AuthRepository authRepository, // Initialize AuthRepository
+    required UpdateUserFacultyUseCase updateUserFacultyUseCase,
+    required AuthRepository authRepository,
   })  : _signUpUseCase = signUpUseCase,
         _signInUseCase = signInUseCase,
         _updateUserFacultyUseCase = updateUserFacultyUseCase,
@@ -46,11 +43,10 @@ class AuthProvider with ChangeNotifier {
 
   // Method to handle sign up
   Future<User?> signUp({
-    // Return User? to indicate success/failure
     required String email,
     required String password,
     required String username,
-    required UserRole role, // FacultyId removed from input
+    required UserRole role,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -70,31 +66,30 @@ class AuthProvider with ChangeNotifier {
     result.fold(
       (failure) {
         _errorMessage = _mapFailureToMessage(failure);
-        _currentUser = null; // Clear current user on failure
+        _currentUser = null;
         signedUpUser = null;
       },
       (user) {
-        _currentUser =
-            user; // Store the successfully signed-up user (initially without faculty)
-        _errorMessage = null; // Clear any previous errors on success
+        _currentUser = user;
+        _errorMessage = null;
         signedUpUser = user;
       },
     );
 
     _isLoading = false;
     notifyListeners();
-    return signedUpUser; // Return the user or null
+    return signedUpUser;
   }
 
-  // Method to handle sign in (Crucially, this must also retrieve the user's role and faculty)
-  Future<User?> signIn(
-      {required String email, required String password}) async {
-    // Return User?
+  // Method to handle sign in
+  Future<User?> signIn({
+    required String email,
+    required String password,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    // Use the SignInUseCase with SignInParams
     final signInResult =
         await _signInUseCase(SignInParams(email: email, password: password));
 
@@ -107,8 +102,7 @@ class AuthProvider with ChangeNotifier {
         authenticatedUser = null;
       },
       (user) {
-        _currentUser =
-            user; // Store the logged-in user (who now has a role and facultyId/Name)
+        _currentUser = user;
         _errorMessage = null;
         authenticatedUser = user;
       },
@@ -116,7 +110,7 @@ class AuthProvider with ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
-    return authenticatedUser; // Return the user or null
+    return authenticatedUser;
   }
 
   // New method to update user's faculty
@@ -136,23 +130,19 @@ class AuthProvider with ChangeNotifier {
     result.fold(
       (failure) {
         _errorMessage = _mapFailureToMessage(failure);
-        // If updating current user, need to decide how to handle state on failure
-        // For simplicity, we just show an error message here.
       },
       (user) {
-        // Update the current user in the provider's state with the newly updated user
-        // This ensures the UI reacts to the faculty change.
         if (_currentUser?.id == user.id) {
           _currentUser = user;
         }
-        _errorMessage = null; // Clear any previous errors on success
+        _errorMessage = null;
         success = true;
       },
     );
 
     _isLoading = false;
     notifyListeners();
-    return success; // Indicate if the update was successful
+    return success;
   }
 
   // Method to sign out
@@ -181,7 +171,6 @@ class AuthProvider with ChangeNotifier {
     final result = await _authRepository.getCurrentUser();
     result.fold(
       (failure) {
-        // Handle potential errors, but for initial check, might just leave user as null
         print('Error checking auth status: ${_mapFailureToMessage(failure)}');
       },
       (user) {
@@ -207,159 +196,8 @@ class AuthProvider with ChangeNotifier {
 
   // Add method to check if user needs to select faculty
   bool requiresFacultySelection() {
-    // A user needs faculty selection if they are logged in, are a regular user,
-    // AND their facultyId is empty/null.
     return _currentUser != null &&
         _currentUser!.role == UserRole.user &&
-        (_currentUser!.facultyId == null ||
-            _currentUser!.facultyId!.isEmpty); // Check the faculty ID field
+        (_currentUser!.facultyId == null || _currentUser!.facultyId!.isEmpty);
   }
-
-  // Potential method to check initial auth state on app start
-  // This would typically involve checking stored tokens or calling a 'getCurrentUser' backend endpoint
-  // Future<void> checkAuthStatus() async {
-  //   _isLoading = true;
-  //   // Simulate checking for a logged-in user
-  //   await Future.delayed(const Duration(seconds: 0)); // Quick check
-  //   // In a real app, fetch user from local storage or backend
-  //   // If user found, set _currentUser = user;
-  //   _isLoading = false;
-  //   notifyListeners();
-  // }
-
-  // ... potentially other methods related to auth state
 }
-
-// // *** File: lib/presentation/providers/auth_provider.dart ***
-// import 'package:flutter/material.dart';
-// import '../../domain/entities/user.dart';
-// import '../../domain/usecases/sign_in_usecase.dart';
-// import '../../domain/usecases/sign_up_usecase.dart';
-// import '../../domain/repositories/auth_repository.dart';
-// import '../../core/error/failures.dart';
-
-// class AuthProvider extends ChangeNotifier {
-//   final SignUpUseCase _signUpUseCase;
-//   final SignInUseCase _signInUseCase;
-//   final AuthRepository _authRepository;
-
-//   AuthProvider(
-//     this._signUpUseCase,
-//     this._signInUseCase,
-//     this._authRepository,
-//   ); // Updated constructor
-
-//   User? _user;
-//   User? get user => _user;
-
-//   String? _selectedFaculty;
-//   String? get selectedFaculty => _selectedFaculty;
-//   void selectFaculty(String faculty) {
-//     _selectedFaculty = faculty;
-//     notifyListeners();
-//   }
-
-//   bool _isLoading = false;
-//   bool get isLoading => _isLoading;
-
-//   String _errorMessage = '';
-//   String get errorMessage => _errorMessage;
-
-//   Future<void> signUp(String username, String email, String password) async {
-//     _isLoading = true;
-//     _errorMessage = '';
-//     notifyListeners();
-
-//     if (_selectedFaculty == null) {
-//       _errorMessage = 'Please select a faculty.';
-//       _isLoading = false;
-//       notifyListeners();
-//       return;
-//     }
-
-//     final result = await _signUpUseCase(SignUpParams(
-//       username: username,
-//       email: email,
-//       password: password,
-//       faculty: _selectedFaculty!,
-//     ));
-
-//     result.fold(
-//       (failure) {
-//         _errorMessage = _mapFailureToMessage(failure);
-//         _isLoading = false;
-//         notifyListeners();
-//       },
-//       (user) {
-//         _user = user;
-//         _isLoading = false;
-//         notifyListeners();
-//         // Optionally navigate to home screen
-//       },
-//     );
-//   }
-
-//   Future<void> signIn(String email, String password) async {
-//     _isLoading = true;
-//     _errorMessage = '';
-//     notifyListeners();
-
-//     final result =
-//         await _signInUseCase(SignInParams(email: email, password: password));
-
-//     result.fold(
-//       (failure) {
-//         _errorMessage = _mapFailureToMessage(failure);
-//         _isLoading = false;
-//         notifyListeners();
-//       },
-//       (user) {
-//         _user = user;
-//         _isLoading = false;
-//         notifyListeners();
-//         // Optionally navigate to home screen
-//       },
-//     );
-//   }
-
-//   Future<void> signOut() async {
-//     _isLoading = true;
-//     _errorMessage = '';
-//     notifyListeners();
-
-//     final result = await _authRepository.signOut();
-
-//     result.fold(
-//       (failure) {
-//         _errorMessage = _mapFailureToMessage(failure);
-//         _isLoading = false;
-//         notifyListeners();
-//       },
-//       (_) {
-//         _user = null;
-//         _isLoading = false;
-//         notifyListeners();
-//         // Optionally navigate to login screen
-//       },
-//     );
-//   }
-
-//   Future<void> checkInitialAuthStatus() async {
-//     // Changed method name
-//     final result = await _authRepository.getCurrentUser();
-//     result.fold(
-//       (failure) {
-//         // Handle potential errors, but for initial check, might just leave user as null
-//       },
-//       (user) {
-//         _user = user;
-//         notifyListeners();
-//       },
-//     );
-//   }
-
-//   String _mapFailureToMessage(Failure failure) {
-//     // Implement your failure to message mapping here
-//     return failure.message ?? 'An unexpected error occurred.';
-//   }
-// }
