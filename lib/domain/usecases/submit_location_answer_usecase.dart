@@ -8,21 +8,23 @@ import 'submit_quest_answer_usecase.dart'; // Import the abstract use case and p
 // Orchestrates the submission of a location check-in using the submission service.
 // ========================================================================
 class SubmitLocationAnswerUseCase
-    implements SubmitQuestAnswerUseCase<SubmitLocationAnswerParams> {
-  // Dependency on the QuestSubmissionService
-  final QuestSubmissionService _submissionService;
+    implements SubmitQuestAnswerUseCase<SubmitLocationAnswerParams> {
+  // Dependency on the QuestSubmissionService
+  final QuestSubmissionService _submissionService;
 
-  SubmitLocationAnswerUseCase({required QuestSubmissionService submissionService})
-      : _submissionService = submissionService;
+  SubmitLocationAnswerUseCase(
+      {required QuestSubmissionService submissionService})
+      : _submissionService = submissionService;
 
-  @override
-  Future<Either<Failure, QuestSubmissionResult>> call(SubmitLocationAnswerParams params) async {
-    // Call the submission service to process the location check-in
-    return await _submissionService.processLocationCheckInSubmission(
-      questId: params.questId,
-      userId: params.userId,
-      latitude: params.latitude,
-      longitude: params.longitude,
-    );
-  }
+  @override
+  Future<Either<Failure, QuestSubmissionResult>> call(
+      SubmitLocationAnswerParams params) async {
+    // Call the submission service to process the location check-in
+    return await _submissionService.processLocationCheckInSubmission(
+      questId: params.questId,
+      userId: params.userId,
+      latitude: params.latitude,
+      longitude: params.longitude,
+    );
+  }
 }

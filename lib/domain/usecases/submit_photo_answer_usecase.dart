@@ -8,20 +8,21 @@ import 'submit_quest_answer_usecase.dart'; // Import the abstract use case and p
 // Orchestrates the submission of a photo challenge using the submission service.
 // ========================================================================
 class SubmitPhotoAnswerUseCase
-    implements SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams> {
-  // Dependency on the QuestSubmissionService
-  final QuestSubmissionService _submissionService;
+    implements SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams> {
+  // Dependency on the QuestSubmissionService
+  final QuestSubmissionService _submissionService;
 
-  SubmitPhotoAnswerUseCase({required QuestSubmissionService submissionService})
-      : _submissionService = submissionService;
+  SubmitPhotoAnswerUseCase({required QuestSubmissionService submissionService})
+      : _submissionService = submissionService;
 
-  @override
-  Future<Either<Failure, QuestSubmissionResult>> call(SubmitPhotoAnswerParams params) async {
-    // Call the submission service to process the photo challenge
-    return await _submissionService.processPhotoChallengeSubmission(
-      questId: params.questId,
-      userId: params.userId,
-      imagePath: params.imagePath,
-    );
-  }
+  @override
+  Future<Either<Failure, QuestSubmissionResult>> call(
+      SubmitPhotoAnswerParams params) async {
+    // Call the submission service to process the photo challenge
+    return await _submissionService.processPhotoChallengeSubmission(
+      questId: params.questId,
+      userId: params.userId,
+      imagePath: params.imagePath,
+    );
+  }
 }
