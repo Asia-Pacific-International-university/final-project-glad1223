@@ -3,314 +3,201 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dartz/dartz.dart';
 import 'package:final_project/domain/entities/quest.dart'
-    as q; // Import the domain Quest
+    as q; // Import the domain Quest
 
-// 1. Domain Entity (Use the domain Quest - q.Quest)
-// class Quest {
-//  final String? id;
-//  // Add other relevant quest properties
-//  Quest({this.id});
-//}  REMOVED
+// Assuming these are defined in your project:
+import 'package:final_project/core/error/failures.dart'; // Import Failure
+import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
+import 'package:final_project/domain/services/quest_submission_service.dart'; // Import SubmissionResult
+import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
 
-// 2. Failure Class Hierarchy (Simplified and Corrected)
-abstract class Failure {
-  final String message;
-  Failure({required this.message});
-}
+import 'package:go_router/go_router.dart'; // For navigation
+import '../../../core/constants/app_constants.dart'; // For routes
+import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
 
-class LocationFailure extends Failure {
-  LocationFailure({required String message}) : super(message: message);
-}
 
-class ServerFailure extends Failure {
-  ServerFailure({String? message}) : super(message: message ?? 'Server Error');
-}
+// Assuming LocationService and its provider are defined elsewhere
+// import 'package:final_project/core/services/location_service.dart';
+// final locationServiceProvider = Provider<LocationService>((ref) => LocationService());
 
-class UnexpectedFailure extends Failure {
-  UnexpectedFailure({String? message})
-      : super(message: message ?? 'Unexpected Error');
-}
+// Assuming SubmitLocationAnswerUseCase and its provider are defined elsewhere
+// import 'package:final_project/domain/usecases/submit_location_answer_usecase.dart';
+// final submitLocationAnswerUseCaseProvider = Provider<SubmitQuestAnswerUseCase<SubmitLocationAnswerParams>>(...);
 
-// 3. UseCase Interface
-abstract class UseCase<Type, Params> {
-  Future<Either<Failure, Type>> call(Params params);
-}
 
-// 4. Define Parameters Class
-class SubmitLocationAnswerParams {
-  final String questId;
-  final double latitude;
-  final double longitude;
-
-  SubmitLocationAnswerParams({
-    required this.questId,
-    required this.latitude,
-    required this.longitude,
-  });
-}
-
-// 5. Define UseCase
-class SubmitLocationAnswerUseCase
-    implements UseCase<void, SubmitLocationAnswerParams> {
-  final QuestRepository _questRepository;
-
-  SubmitLocationAnswerUseCase({required QuestRepository questRepository})
-      : _questRepository = questRepository;
-
-  @override
-  Future<Either<Failure, void>> call(SubmitLocationAnswerParams params) async {
-    try {
-      print(
-          'SubmitLocationAnswerUseCase: questId=${params.questId}, latitude=${params.latitude}, longitude=${params.longitude}'); // Add logging
-      await _questRepository.submitCheckInLocation(
-          params.questId, params.latitude, params.longitude);
-      print(
-          'SubmitLocationAnswerUseCase: Repository call successful'); // Add logging
-      return const Right(null);
-    } on Failure catch (failure) {
-      print(
-          'SubmitLocationAnswerUseCase: Failure: ${failure.message}'); // Add logging
-      return Left(failure);
-    } catch (e) {
-      print('SubmitLocationAnswerUseCase: Unexpected error: $e'); // Add logging
-      return Left(UnexpectedFailure(message: 'Unexpected error: $e'));
-    }
-  }
-}
-
-// 6. Abstract Repository
-abstract class QuestRepository {
-  Future<void> submitCheckInLocation(
-      String questId, double latitude, double longitude);
-  // Add other repository methods as needed
-}
-
-// 7. *Mock* Repository Implementation
-class MockQuestRepository implements QuestRepository {
-  @override
-  Future<void> submitCheckInLocation(
-      String questId, double latitude, double longitude) async {
-    print(
-        'MockQuestRepository: questId=$questId, latitude=$latitude, longitude=$longitude'); // Add logging
-    // Simulate a successful submission
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Simulate errors based on input (for testing)
-    if (latitude == 0.0 && longitude == 0.0) {
-      print('MockQuestRepository: Throwing LocationFailure');
-      throw LocationFailure(message: 'Invalid coordinates');
-    }
-    if (questId == 'error_quest') {
-      print('MockQuestRepository: Throwing ServerFailure');
-      throw ServerFailure(message: 'Simulated server error');
-    }
-    print('MockQuestRepository: Success');
-    return Future.value(); // Return a completed Future<void>
-  }
-}
-
-// 8. Location Service (Simplified)
-class LocationService {
-  Future<Position> getCurrentLocation() async {
-    print('LocationService: getCurrentLocation called'); // Add logging
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      print('LocationService: Location services are disabled');
-      throw LocationServiceDisabledException();
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        print('LocationService: Location permissions are denied');
-        throw PermissionDeniedException('Location permissions are denied');
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      print('LocationService: Location permissions are permanently denied');
-      throw LocationFailure(
-          message:
-              'Location permissions are permanently denied.'); // Changed to use LocationFailure
-    }
-    print('LocationService: Getting current position');
-    final position = await Geolocator.getCurrentPosition();
-    print('LocationService: Got position: $position');
-    return position;
-  }
-}
-
-// 9. Providers
-final locationServiceProvider =
-    Provider<LocationService>((ref) => LocationService());
-final questRepositoryProvider =
-    Provider<QuestRepository>((ref) => MockQuestRepository()); // Use Mock
-final submitLocationAnswerUseCaseProvider =
-    Provider<SubmitLocationAnswerUseCase>(
-  (ref) => SubmitLocationAnswerUseCase(
-    questRepository: ref.read(questRepositoryProvider),
-  ),
-);
-
-// 10. LocationCheckInQuestWidget
+// ========================================================================
+// LOCATION CHECK-IN QUEST WIDGET
+// Displays UI for location check-in and handles submission.
+// ========================================================================
 class LocationCheckInQuestWidget extends ConsumerStatefulWidget {
-  final q.Quest quest; // Use the domain Quest
+  final q.Quest quest; // Use the domain Quest
 
-  const LocationCheckInQuestWidget({super.key, required this.quest});
+  const LocationCheckInQuestWidget({super.key, required this.quest});
 
-  @override
-  ConsumerState<LocationCheckInQuestWidget> createState() =>
-      _LocationCheckInQuestWidgetState();
+  @override
+  ConsumerState<LocationCheckInQuestWidget> createState() =>
+      _LocationCheckInQuestWidgetState();
 }
-
-// class LocationCheckInQuest extends q.Quest {  // Remove this
-//  final String locationName;
-//
-//  LocationCheckInQuest({
-//    required super.id,
-//    required super.type,
-//    required super.title,
-//    super.description,
-//    required this.locationName,
-//  });
-//}
 
 class _LocationCheckInQuestWidgetState
-    extends ConsumerState<LocationCheckInQuestWidget> {
-  Position? _currentPosition;
-  String _locationStatus = 'Tap to get location';
+    extends ConsumerState<LocationCheckInQuestWidget> {
+  Position? _currentPosition;
+  String _locationStatus = 'Tap to get location';
+  bool _isGettingLocation = false;
+  bool _isSubmitting = false;
 
-  Future<void> _getCurrentLocation() async {
-    setState(() {
-      _locationStatus = 'Getting location...';
-    });
-    try {
-      final position =
-          await ref.read(locationServiceProvider).getCurrentLocation();
-      setState(() {
-        _currentPosition = position;
-        _locationStatus = 'Location acquired!';
-      });
-    } catch (e) {
-      String errorMessage = 'Error getting location: $e';
-      if (e is LocationServiceDisabledException) {
-        errorMessage = 'Location services are disabled.';
-      } else if (e is PermissionDeniedException) {
-        errorMessage = 'Location permission denied.';
-      } else {
-        // Handle the general case
-        errorMessage = 'Error: ${e.toString()}';
-      }
-      setState(() {
-        _locationStatus = errorMessage;
-      });
-    }
-  }
+  Future<void> _getCurrentLocation() async {
+    if (_isGettingLocation) return;
 
-  @override
-  Widget build(BuildContext context) {
-    // Removed WidgetRef ref
-    final submitLocationUseCase =
-        ref.read(submitLocationAnswerUseCaseProvider); //Add this back
+    setState(() {
+      _locationStatus = 'Getting location...';
+      _isGettingLocation = true;
+      _currentPosition = null; // Clear previous position
+    });
+    try {
+      final position =
+          await ref.read(locationServiceProvider).getCurrentLocation();
+      setState(() {
+        _currentPosition = position;
+        _locationStatus = 'Location acquired!';
+      });
+    } catch (e) {
+      String errorMessage = 'Error getting location: $e';
+      if (e is LocationServiceDisabledException) {
+        errorMessage = 'Location services are disabled.';
+      } else if (e is PermissionDeniedException) {
+        errorMessage = 'Location permission denied.';
+      } else if (e is Failure) { // Handle custom LocationFailure
+        errorMessage = 'Location Error: ${e.message}';
+      }
+      setState(() {
+        _locationStatus = errorMessage;
+        _currentPosition = null; // Ensure position is null on error
+      });
+      _showError(context, Failure(message: errorMessage)); // Show error snackbar
+    } finally {
+      setState(() {
+        _isGettingLocation = false;
+      });
+    }
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Check-in your current location:',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text('Status: $_locationStatus'),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: _getCurrentLocation,
-          child: const Text('Get Current Location'),
-        ),
-        const SizedBox(height: 16),
-        if (_currentPosition != null)
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                if (widget.quest.id == null) {
-                  //add null check
-                  _showError(
-                      context,
-                      UnexpectedFailure(
-                          message:
-                              'Quest ID is null.  Cannot submit location.'));
-                  return;
-                }
-                if (_currentPosition == null) {
-                  _showError(
-                      context,
-                      UnexpectedFailure(
-                          message:
-                              'Current position is null.  Cannot submit location.'));
-                  return;
-                }
-                final resultFuture = submitLocationUseCase(
-                  SubmitLocationAnswerParams(
-                    questId: widget.quest.id ?? '',
-                    latitude: _currentPosition!.latitude,
-                    longitude: _currentPosition!.longitude,
-                  ),
-                ); // Store the Future
-                final result = await resultFuture; // Await it
-                result.fold(
-                  (failure) => _showError(context, failure),
-                  (success) => _showSuccess(context), //  use the result of fold
-                );
-              } catch (e) {
-                _showError(
-                    context,
-                    UnexpectedFailure(
-                        message:
-                            'Unexpected error: $e')); // Wrap in UnexpectedFailure
-              }
-            },
-            child: const Text('Submit Location'),
-          ),
-      ],
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    final submitLocationUseCase =
+        ref.read(submitLocationAnswerUseCaseProvider);
 
-  void _showError(BuildContext context, Failure failure) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error: ${failure.message}'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Check-in your current location:',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text('Status: $_locationStatus'),
+        const SizedBox(height: 8),
+        ElevatedButton(
+          onPressed: _isGettingLocation ? null : _getCurrentLocation, // Disable while getting location
+          child: _isGettingLocation
+              ? const SizedBox( // Show spinner when getting location
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                )
+              : const Text('Get Current Location'),
+        ),
+        const SizedBox(height: 16),
+        if (_currentPosition != null)
+          ElevatedButton(
+            onPressed: _isSubmitting ? null : () => _handleSubmit(context, ref, submitLocationUseCase), // Disable while submitting
+            child: _isSubmitting
+                  ? const SizedBox( // Show spinner when submitting
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : const Text('Submit Location'),
+          ),
+      ],
+    );
+  }
 
-  void _showSuccess(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Location submitted!')),
-    );
-  }
+  Future<void> _handleSubmit(
+    BuildContext context,
+    WidgetRef ref, // Added ref to access AuthProvider
+    SubmitQuestAnswerUseCase<SubmitLocationAnswerParams> submitLocationUseCase, // Use the specific type
+  ) async {
+    if (_currentPosition == null) {
+      _showError(context, const Failure(message: 'Please get your location first.'));
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true; // Set submitting state
+    });
+
+    // Get the actual logged-in user's ID from AuthProvider
+    final authProvider = ref.read(authProvider); // Assuming authProvider is a Riverpod provider
+    final userId = authProvider.currentUser?.id;
+
+    if (userId == null) {
+      _showError(context, const Failure(message: 'User not logged in. Cannot submit.'));
+      setState(() { _isSubmitting = false; });
+      return;
+    }
+
+
+    final params = SubmitLocationAnswerParams(
+      questId: widget.quest.id ?? '',
+      latitude: _currentPosition!.latitude,
+      longitude: _currentPosition!.longitude,
+      userId: userId,
+    );
+
+    final result = await submitLocationUseCase(params);
+
+    result.fold(
+      (failure) {
+        _showError(context, failure);
+      },
+      (submissionResult) { // Use the QuestSubmissionResult from the service
+        _showSuccess(context);
+        // Navigate to QuestResultScreen with the result data
+        GoRouter.of(context).go(AppConstants.questResultRoute, extra: {
+          'isSuccessful': submissionResult.isSuccessful,
+          'pointsEarned': submissionResult.pointsEarned,
+          'feedbackMessage': submissionResult.feedbackMessage,
+          'newBadges': submissionResult.newBadges,
+        });
+
+        // TODO: Optionally trigger a profile refresh if needed, although backend update + stream should handle this
+        // ref.read(profileProvider.notifier).getUserProfile(userId); // Example if ProfileProvider has a notifier
+      },
+    );
+
+    setState(() {
+      _isSubmitting = false; // Reset submitting state
+    });
+  }
+
+
+  void _showError(BuildContext context, Failure failure) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: ${failure.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showSuccess(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Location submitted!')),
+    );
+  }
 }
-
-// class LocationCheckInQuestAdapter extends q.Quest {  // Removed Adapter
-//  final q.Quest _quest;
-//
-//  LocationCheckInQuestAdapter(this._quest)
-//      : super(
-//          id: _quest.id,
-//          type: _quest.type,
-//          title: _quest.title,
-//          description: _quest.description,
-//          question: _quest.question,
-//          options: _quest.options,
-//          correctAnswer: _quest.correctAnswer,
-//          locationName: _quest.locationName, // Pass locationName
-//          latitude: _quest.latitude,
-//          longitude: _quest.longitude,
-//          photoTheme: _quest.photoTheme,
-//          timeLimitSeconds: _quest.timeLimitSeconds,
-//          startTime: _quest.startTime,
-//        );
-//  // Adapt any other properties needed by LocationCheckInQuestWidget
-//}

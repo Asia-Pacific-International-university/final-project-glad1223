@@ -1,176 +1,220 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:final_project/domain/entities/quest.dart';
-//import 'package:final_project/presentation/providers/quest_provider.dart';
-//import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart';
-import 'package:dartz/dartz.dart';
-import 'package:final_project/core/error/failures.dart';
+import 'package:final_project/domain/entities/quest.dart' as q; // Alias to avoid conflict
+// Assuming these are defined in your project:
+import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
+import 'package:final_project/core/error/failures.dart'; // Import Failure
+import 'package:dartz/dartz.dart'; // Import Either
+import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
 
-// 1. Define Parameters Class
-class ProcessQuestSubmissionParams {
-  final String questId;
-  final String answer;
-  final String userId;
-  final int pointsAwarded;
+import 'package:go_router/go_router.dart'; // For navigation
+import '../../../core/constants/app_constants.dart'; // For routes
+import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
 
-  ProcessQuestSubmissionParams({
-    required this.questId,
-    required this.answer,
-    required this.userId,
-    required this.pointsAwarded,
-  });
+
+// ========================================================================
+// TRIVIA QUEST WIDGET
+// Displays a trivia question (supports multiple choice) and handles submission.
+// ========================================================================
+class TriviaQuestWidget extends ConsumerStatefulWidget {
+  // Assuming q.Quest entity has:
+  // String? question;
+  // List<String>? options; // For multiple choice
+  // String? correctAnswer; // Or int? correctOptionIndex; - for validation (often done on backend)
+  final q.Quest quest;
+
+  const TriviaQuestWidget({super.key, required this.quest});
+
+  @override
+  ConsumerState<TriviaQuestWidget> createState() => _TriviaQuestWidgetState();
 }
 
-class TriviaQuestWidget extends ConsumerWidget {
-  final Quest quest;
-  final TextEditingController _answerController = TextEditingController();
+class _TriviaQuestWidgetState extends ConsumerState<TriviaQuestWidget> {
+  // State to hold the currently selected option index for multiple choice
+  int? _selectedOptionIndex;
+  bool _isSubmitting = false; // To prevent multiple submissions
 
-  TriviaQuestWidget({super.key, required this.quest});
+  @override
+  Widget build(BuildContext context) {
+    // Access the UseCase provider
+    final submitTriviaUseCase = ref.read(submitTriviaAnswerUseCaseProvider);
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 2. Access the UseCase
-    final submitTriviaUseCase = ref.read(submitQuestAnswerUseCaseProvider);
+    // Safely access quest data
+    final question = widget.quest.question;
+    final options = widget.quest.options; // Assuming 'options' field exists in q.Quest (List<String>?)
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 3. Safely Access Quest Data
-          _buildQuestionText(),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _answerController,
-            decoration: const InputDecoration(
-              labelText: 'Your Answer',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => _handleSubmit(
-                context, ref, submitTriviaUseCase), // Corrected here
-            child: const Text('Submit Answer'),
-          ),
-        ],
-      ),
-    );
-  }
+    // Determine if it's multiple choice or open text based on options availability
+    final isMultipleChoice = options != null && options.isNotEmpty;
 
-  // 4. Extract Question Display
-  Widget _buildQuestionText() {
-    if (quest.question != null) {
-      return Text(
-        'Question: ${quest.question}',
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-      );
-    }
-    return const Text('Question: (No question data available)',
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18));
-  }
+    if (question == null) {
+      return const Center(child: Text('Invalid trivia quest data: Missing question.'));
+    }
 
-  // 5. Extract Submit Logic
-  Future<void> _handleSubmit(BuildContext context, WidgetRef ref,
-      SubmitQuestAnswerUseCase submitTriviaUseCase) async {
-    // Added return type
-    if (_answerController.text.trim().isNotEmpty) {
-      final params = ProcessQuestSubmissionParams(
-        questId: quest.id ?? '',
-        answer: _answerController.text.trim(),
-        userId: 'user_id', // Replace with actual user ID
-        pointsAwarded: 10, // Replace with actual points
-      );
+    // If it's multiple choice but options are missing/empty, show error
+    if (isMultipleChoice && (options == null || options.isEmpty)) {
+       return const Center(child: Text('Invalid trivia quest data: Missing options for multiple choice.'));
+    }
 
-      final result = await submitTriviaUseCase(params); // Await the result
 
-      // Handle the result using fold. This is the correct way to handle Either.
-      result.fold(
-        (failure) {
-          _showError(context, failure);
-        },
-        (success) {
-          _showSuccess(context);
-        },
-      );
-    } else {
-      _showInputError(context);
-    }
-  }
+    return SingleChildScrollView( // Use SingleChildScrollView if content can be long
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Display the question
+          Text(
+            'Question: $question',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 16),
 
-  // 6. Extracted Error and Success Handlers
-  void _showError(BuildContext context, Failure failure) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error: ${failure.message}'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
+          // Render either multiple choice options or a text field
+          if (isMultipleChoice)
+            _buildMultipleChoiceOptions(options!), // Pass non-nullable options
+          // else
+          //   _buildOpenTextInput(), // Implement if you need open text input
 
-  void _showSuccess(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Answer submitted successfully!')),
-    );
-    _answerController.clear();
-  }
+          const SizedBox(height: 16),
 
-  void _showInputError(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please enter your answer.')),
-    );
-  }
-}
+          // Submit button
+          Center( // Center the button
+            child: ElevatedButton(
+              // Disable button if no option selected (for multiple choice) or if submitting
+              onPressed: (_selectedOptionIndex == null && isMultipleChoice) || _isSubmitting
+                  ? null
+                  // For multiple choice, pass the text of the selected option
+                  : () => _handleSubmit(context, ref, submitTriviaUseCase, isMultipleChoice ? options![_selectedOptionIndex!] : 'N/A'), // Pass ref and submitted answer
 
-// 7. (CRITICAL) Define the UseCase and Provider (if you haven't already)
-//     These should be in their respective files (e.g., domain/usecases/submit_quest_answer_usecase.dart)
-//
-//     Example UseCase:
-abstract class SubmitQuestAnswerUseCase
-    extends UseCase<void, ProcessQuestSubmissionParams> {
-  Future<Either<Failure, void>> call(ProcessQuestSubmissionParams params);
-}
+              child: _isSubmitting
+                  ? const SizedBox( // Show spinner when submitting
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : const Text('Submit Answer'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-class SubmitQuestAnswerUseCaseImpl implements SubmitQuestAnswerUseCase {
-  // Replace with your actual repository
-  // final QuestRepository _questRepository;
-  // SubmitQuestAnswerUseCaseImpl(this._questRepository);
+  // Builds the UI for multiple choice options
+  Widget _buildMultipleChoiceOptions(List<String> options) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: options.asMap().entries.map((entry) {
+        final index = entry.key;
+        final optionText = entry.value;
+        return RadioListTile<int>(
+          title: Text(optionText),
+          value: index, // The value of this radio button is its index
+          groupValue: _selectedOptionIndex, // The currently selected value in the group
+          onChanged: _isSubmitting ? null : (int? value) { // Disable while submitting
+            setState(() {
+              _selectedOptionIndex = value;
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
 
-  @override
-  Future<Either<Failure, void>> call(
-      ProcessQuestSubmissionParams params) async {
-    // Simulate a successful submission. Replace this with your actual logic.
-    // try {
-    //   await _questRepository.submitAnswer(params.questId, params.answer, params.userId, params.pointsAwarded);
-    //   return const Right(null);
-    // } catch (e) {
-    //   return Left(SomeSpecificFailure(message: e.toString())); // Create specific failure types
-    // }
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
-    if (params.answer == "correct") {
-      return const Right(null);
-    } else {
-      return Left(IncorrectAnswerFailure(
-          message: "Incorrect Answer.  Please try again."));
-    }
-  }
-}
+  // // Example: Builds the UI for open text input (if needed)
+  // Widget _buildOpenTextInput() {
+  //   return TextField(
+  //     controller: _answerController, // You'd need a TextEditingController state variable
+  //     decoration: const InputDecoration(
+  //       labelText: 'Your Answer',
+  //       border: OutlineInputBorder(),
+  //     ),
+  //   );
+  // }
 
-//
-//     Example Provider (in presentation/providers/quest_provider.dart)
-final submitQuestAnswerUseCaseProvider =
-    Provider<SubmitQuestAnswerUseCase>((ref) {
-  // Replace with your repository implementation
-  // final questRepository = ref.read(questRepositoryProvider);  // Get your repository
-  return SubmitQuestAnswerUseCaseImpl(); // Pass the repository to the UseCase
-});
 
-// 8. (CRITICAL) Define Failure type
-class IncorrectAnswerFailure extends Failure {
-  IncorrectAnswerFailure({required String message}) : super(message: message);
-}
+  // Handle the submission logic
+  Future<void> _handleSubmit(
+    BuildContext context,
+    WidgetRef ref, // Added ref to access AuthProvider
+    SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams> submitTriviaUseCase, // Use the specific type
+    String submittedAnswer, // The answer to submit (option text or open text)
+  ) async {
+    setState(() {
+      _isSubmitting = true; // Set submitting state
+    });
 
-// 9. (CRITICAL)  Define the UseCase Interface
-abstract class UseCase<Type, Params> {
-  Future<Either<Failure, Type>> call(Params params);
+    // Get the actual logged-in user's ID from AuthProvider
+    final authProvider = ref.read(authProvider); // Assuming authProvider is a Riverpod provider
+    final userId = authProvider.currentUser?.id;
+
+    if (userId == null) {
+      // Handle case where user is not logged in (shouldn't happen if routes are protected)
+      _showError(context, const Failure(message: 'User not logged in. Cannot submit.'));
+      setState(() { _isSubmitting = false; });
+      return;
+    }
+
+    // Create parameters for the use case
+    final params = SubmitTriviaAnswerParams(
+      questId: widget.quest.id ?? '', // Use the quest ID
+      answer: submittedAnswer,
+      userId: userId,
+    );
+
+    // Call the use case to submit the answer
+    final result = await submitTriviaUseCase(params);
+
+    // Handle the result using fold
+    result.fold(
+      (failure) {
+        _showError(context, failure);
+      },
+      (submissionResult) { // Use the QuestSubmissionResult from the service
+        _showSuccess(context);
+        // Navigate to QuestResultScreen with the result data
+        GoRouter.of(context).go(AppConstants.questResultRoute, extra: {
+          'isSuccessful': submissionResult.isSuccessful,
+          'pointsEarned': submissionResult.pointsEarned,
+          'feedbackMessage': submissionResult.feedbackMessage,
+          'newBadges': submissionResult.newBadges,
+        });
+
+        // TODO: Optionally trigger a profile refresh if needed, although backend update + stream should handle this
+        // ref.read(profileProvider.notifier).getUserProfile(userId); // Example if ProfileProvider has a notifier
+      },
+    );
+
+    setState(() {
+      _isSubmitting = false; // Reset submitting state
+    });
+  }
+
+  // Extracted Error and Success Handlers
+  void _showError(BuildContext context, Failure failure) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: ${failure.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showSuccess(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Answer submitted successfully!')),
+    );
+    // Optionally reset selected option after successful submission
+    setState(() {
+      _selectedOptionIndex = null;
+    });
+  }
+
+  // This is no longer needed for multiple choice, but kept for reference if open text is added
+  // void _showInputError(BuildContext context) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(content: Text('Please enter your answer.')),
+  //   );
+  // }
 }

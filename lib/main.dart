@@ -1,124 +1,206 @@
-// import 'package:flutter/material.dart';
-// import 'package:provider/provider.dart';
-// import 'app.dart';
-// import 'core/theme/theme_provider.dart';
-// import 'core/navigation/app_router.dart';
-// import 'package:firebase_core/firebase_core.dart';
-// import 'package:get_it/get_it.dart';
-// import 'domain/repositories/user_repositories.dart';
-// import 'data/repositories/user_repository_impl.dart';
-// import 'presentation/providers/auth_provider.dart';
-// import 'presentation/providers/profile_provider.dart';
-// import 'data/repositories/leaderboard_repository_impl.dart';
-// import 'package:final_project/domain/repositories/leaderboard_repositories.dart';
-// import 'presentation/providers/leaderboard_provider.dart';
-// import 'data/datasources/remote/api_client.dart';
-// import 'domain/repositories/auth_repository.dart';
-// import 'data/repositories/auth_repository_impl.dart';
-// import 'domain/usecases/sign_up_usecase.dart';
-// import 'domain/usecases/sign_in_usecase.dart';
-// import 'data/datasources/remote/auth_remote_datasource.dart';
-// import 'data/datasources/remote/auth_remote_datasource_impl.dart'
-//     as auth_remote_impl;
-
-// final getIt = GetIt.instance;
-
-// void setupDependencies() {
-//   // Register your ApiClient (using the concrete implementation)
-//   getIt.registerLazySingleton<ApiClient>(
-//     () => HttpApiClient(),
-//   );
-
-//   // Register your remote data source
-//   getIt.registerLazySingleton<AuthRemoteDataSource>(
-//     () => auth_remote_impl.AuthRemoteDataSourceImpl(getIt<ApiClient>()),
-//     //getIt.registerLazySingleton<ApiClient>(() => ApiClient(/* any required parameters */));
-//   );
-
-//   // Register your repositories
-//   getIt.registerLazySingleton<UserRepositories>(
-//     () => UserRepositoryImpl(getIt<ApiClient>()),
-//   );
-//   getIt.registerLazySingleton<LeaderboardRepositories>(
-//     () => LeaderboardRepositoryImpl(getIt<ApiClient>()),
-//   );
-//   getIt.registerLazySingleton<AuthRepository>(
-//     () => AuthRepositoryImpl(getIt<AuthRemoteDataSource>()),
-//   );
-
-//   // Register your use cases
-//   getIt.registerLazySingleton(
-//     () => SignUpUseCase(getIt<AuthRepository>()),
-//   );
-//   getIt.registerLazySingleton(() => SignInUseCase(getIt<AuthRepository>()));
-
-//   // Register your providers
-//   getIt.registerFactory(() => AuthProvider(
-//         getIt<SignUpUseCase>(),
-//         getIt<SignInUseCase>(),
-//         getIt<AuthRepository>(),
-//       ));
-//   getIt.registerFactory(() => ProfileProvider(
-//         userRepository: getIt<UserRepositories>(), // Added named parameter
-//       ));
-//   getIt.registerFactory(() => LeaderboardProvider(
-//         leaderboardRepository:
-//             getIt<LeaderboardRepositories>(), // Added named parameter
-//       ));
-//   getIt.registerFactory(() => ThemeProvider());
-//   getIt.registerLazySingleton(() => AppRouter());
-// }
-
-// void main() async {
-//   WidgetsFlutterBinding.ensureInitialized();
-//   //await Firebase.initializeApp();
-
-//   setupDependencies();
-
-//   runApp(
-//     MultiProvider(
-//       providers: [
-//         ChangeNotifierProvider<ThemeProvider>(
-//             create: (_) => getIt<ThemeProvider>()),
-//         ChangeNotifierProvider<AuthProvider>(
-//             create: (_) => getIt<AuthProvider>()),
-//         ChangeNotifierProvider<ProfileProvider>(
-//             create: (_) => getIt<ProfileProvider>()),
-//         ChangeNotifierProvider<LeaderboardProvider>(
-//             create: (_) => getIt<LeaderboardProvider>()),
-//         Provider<AppRouter>(create: (_) => getIt<AppRouter>()),
-//       ],
-//       child: const CampusPulseChallengeApp(),
-//     ),
-//   );
-// }
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // Assuming Provider is used
 import 'package:go_router/go_router.dart'; // Import GoRouter
 
+// Firebase imports for FCM
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // For foreground notifications
+
+// Your existing project imports
 import 'core/navigation/app_router.dart'; // Your AppRouter
 import 'presentation/providers/auth_provider.dart'; // Your AuthProvider
-// Import necessary dependencies for AuthProvider (Use cases, Repositories, DataSources)
 import 'domain/usecases/sign_up_usecase.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/datasources/remote/auth_remote_datasource_impl.dart';
 import 'domain/usecases/sign_in_usecase.dart';
 import 'domain/usecases/update_user_faculty_usecase.dart';
 import 'domain/repositories/auth_repository.dart';
+import 'core/constants/app_constants.dart'; // To use app routes
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized(); // Required for some plugins
+// ========================================================================
+// 1. TOP-LEVEL FUNCTION FOR FCM BACKGROUND MESSAGES
+// This function must be a top-level function (not inside a class)
+// and marked with @pragma('vm:entry-point') for Flutter to find it.
+// It runs when a message is received while the app is in the background or terminated.
+// ========================================================================
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is initialized for background message handling
+  await Firebase.initializeApp();
+  print("Background Message Handled: ${message.messageId}");
+  print("Background Message Data: ${message.data}");
 
-  // Setup simulated backend dependency
+  // TODO: Implement logic here to process background quest notifications.
+  // For example, save the quest data to a local database for later retrieval,
+  // or trigger a local notification to alert the user.
+  // This is where you would process `message.data` to extract quest info.
+  // If the message contains a quest, you might want to save its ID or details
+  // so that when the app is opened from the notification, the ActiveQuestScreen
+  // can load the correct quest.
+}
+
+// ========================================================================
+// 2. GLOBAL INSTANCE FOR FLUTTER LOCAL NOTIFICATIONS
+// This plugin is used to display notifications when the app is in the foreground.
+// ========================================================================
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+// ========================================================================
+// 3. MAIN FUNCTION - Entry point of the Flutter application
+// ========================================================================
+void main() async {
+  // Ensure Flutter widgets are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase App
+  await Firebase.initializeApp();
+
+  // Set up the background message handler for FCM
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // ======================================================================
+  // 4. INITIALIZE FLUTTER LOCAL NOTIFICATIONS PLUGIN
+  // This configures how local notifications behave on different platforms.
+  // ======================================================================
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings(
+          '@mipmap/ic_launcher'); // Use your app's icon
+
+  final DarwinInitializationSettings initializationSettingsDarwin =
+      DarwinInitializationSettings(
+    onDidReceiveLocalNotification: (id, title, body, payload) async {
+      // Logic for handling iOS local notifications when app is in foreground
+      // (This is for older iOS versions, on newer ones onDidReceiveNotificationResponse is used)
+      print('iOS Local Notification (Foreground): $title, $body, $payload');
+      // You might want to handle navigation here for older iOS versions
+      // if the payload contains navigation data.
+    },
+  );
+
+  final InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsDarwin,
+  );
+
+  // Initialize the plugin with the settings
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      // This callback is triggered when a notification (local or from FCM handled locally)
+      // is tapped by the user, regardless of app state (foreground, background, terminated).
+      print('Notification Response Payload: ${response.payload}');
+      if (response.payload != null && response.payload!.isNotEmpty) {
+        // If the payload contains a questId, navigate to the active quest screen
+        // We use the static router instance from AppRouter for navigation.
+        print('Navigating to quest with ID from payload: ${response.payload}');
+        // Assuming the payload is the questId, navigate to the active quest route
+        // and potentially pass the questId as a parameter if your ActiveQuestScreen
+        // is set up to receive it. For this example, we'll just navigate to the screen.
+        // A more robust implementation would pass the ID and the screen would load it.
+        AppRouter.router.go(AppConstants.activeQuestRoute);
+      }
+    },
+  );
+
+  // ======================================================================
+  // 5. REQUEST NOTIFICATION PERMISSIONS (iOS & Android 13+)
+  // ======================================================================
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    announcement: false,
+    badge: true,
+    carPlay: false,
+    criticalAlert: false,
+    provisional: false,
+    sound: true,
+  );
+
+  print('User notification permission status: ${settings.authorizationStatus}');
+
+  // ======================================================================
+  // 6. GET FCM TOKEN AND SEND TO YOUR BACKEND
+  // This token identifies the specific device for sending targeted notifications.
+  // ======================================================================
+  String? fcmToken = await messaging.getToken();
+  print("FCM Device Token: $fcmToken");
+  // TODO: Send this `fcmToken` to your application's backend.
+  // Associate it with the currently logged-in user so that your backend
+  // can send specific quest notifications to that user's device.
+  // This typically involves an API call from your AuthProvider or a dedicated UserService.
+
+  // ======================================================================
+  // 7. LISTEN FOR FCM MESSAGES WHEN APP IS IN FOREGROUND
+  // ======================================================================
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    print('FCM Message Received in Foreground!');
+    print('Message data: ${message.data}');
+
+    RemoteNotification? notification = message.notification;
+    AndroidNotification? android = message.notification?.android;
+
+    // If there's a notification part, display it as a local notification.
+    // This makes sure the user sees a visual alert even if the app is open.
+    if (notification != null && android != null) {
+      flutterLocalNotificationsPlugin.show(
+        notification.hashCode, // Unique ID for the notification
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'quest_channel', // Android Channel ID (must be unique)
+            'Quest Notifications', // Android Channel Name (user visible)
+            channelDescription: 'Notifications for new and active quests',
+            icon: android.smallIcon, // Icon shown in status bar
+            importance: Importance.high, // Make it a high-priority notification
+            priority: Priority.high,
+            // You can add sound, vibrate patterns etc. here
+          ),
+        ),
+        // Pass data (like questId) as payload so it's available on tap
+        payload: message.data['questId'],
+      );
+    }
+    // TODO: If the user is currently on the ActiveQuestScreen and this notification
+    // is about a new quest, you might want to trigger a state update in the
+    // QuestProvider to load the new quest immediately without requiring a tap.
+    // This would involve accessing the QuestProvider instance here.
+  });
+
+  // ======================================================================
+  // 8. LISTEN FOR FCM MESSAGES WHEN APP IS OPENED FROM NOTIFICATION TAP
+  // This listener is called when a user taps on a notification that brought
+  // the app from background/terminated state to foreground.
+  // ======================================================================
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    print('FCM Message opened app from background/terminated state!');
+    print('Notification Data: ${message.data}');
+    // This is the primary place to navigate the user to the relevant screen,
+    // e.g., the ActiveQuestScreen, using `message.data` to get the quest ID.
+    if (message.data['questId'] != null) {
+      print(
+          'Navigating to quest with ID from opened app: ${message.data['questId']}');
+      // Navigate to the active quest route.
+      // If your ActiveQuestScreen expects a questId parameter in the route,
+      // you would pass it here, e.g., AppRouter.router.go('${AppConstants.activeQuestRoute}/${message.data['questId']}');
+      AppRouter.router.go(AppConstants.activeQuestRoute);
+    }
+  });
+
+  // ======================================================================
+  // 9. DEPENDENCY INJECTION SETUP (Your existing Provider setup)
+  // ======================================================================
   final authRemoteDataSource = AuthRemoteDataSourceImpl();
-  final authRepository = AuthRepositoryImpl(remoteDataSource: authRemoteDataSource);
+  final authRepository =
+      AuthRepositoryImpl(remoteDataSource: authRemoteDataSource);
   final signUpUseCase = SignUpUseCase(authRepository);
   final signInUseCase = SignInUseCase(authRepository);
   final updateUserFacultyUseCase = UpdateUserFacultyUseCase(authRepository);
 
   runApp(
-    MultiProvider( // Or whatever your provider setup is (e.g., Provider, Riverpod)
+    MultiProvider(
       providers: [
         ChangeNotifierProvider(
           create: (_) => AuthProvider(
@@ -126,26 +208,32 @@ void main() {
             signInUseCase: signInUseCase,
             updateUserFacultyUseCase: updateUserFacultyUseCase,
             authRepository: authRepository,
-          )..checkInitialAuthStatus(), // Check initial auth status
+          )..checkInitialAuthStatus(), // Check initial auth status on startup
         ),
         // ... other providers (e.g., for leaderboard, quests)
       ],
       child: MyApp(),
-    )
+    ),
   );
 }
 
+// ========================================================================
+// 10. MYAPP WIDGET - Root of your UI
+// ========================================================================
 class MyApp extends StatelessWidget {
-  final _appRouter = AppRouter();
+  // It's good practice to make the router accessible, perhaps via a static instance
+  // or by passing it down if dynamic navigation is needed from outside widgets.
+  // For GoRouter, often AppRouter itself is designed to be accessible.
+  // Making it static here to allow access from FCM listeners in main.dart
+  static final GoRouter router = AppRouter().router; // Made router static
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      routerConfig: _appRouter.router,
+      routerConfig: MyApp.router, // Use the static router
       title: 'Campus Pulse',
-      // theme: AppTheme.lightTheme, // Assuming you have a theme
-      debugShowCheckedModeBanner: false, // Set to true for debugging
+      // theme: AppTheme.lightTheme, // Uncomment if you have a custom theme
+      debugShowCheckedModeBanner: false, // Set to true for debugging banner
     );
   }
 }
-*/

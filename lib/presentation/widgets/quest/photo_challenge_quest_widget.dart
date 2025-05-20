@@ -4,255 +4,207 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:dartz/dartz.dart';
 import 'package:final_project/domain/entities/quest.dart'
-    as q; // Import the domain Quest
+    as q; // Import the domain Quest
 
-// 1. Domain Entity (Use the domain Quest -  q.Quest)
-//class Quest {
-//  final String? id;
-//  // Add other relevant quest properties
-//  Quest({this.id});
-//}  REMOVED
+// Assuming these are defined in your project:
+import 'package:final_project/core/error/failures.dart'; // Import Failure
+import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
+import 'package:final_project/domain/services/quest_submission_service.dart'; // Import SubmissionResult
+import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
 
-// 2. Failure Class (Ensure this is consistent)
-abstract class Failure {
-  final String message;
-  Failure({required this.message});
-}
+import 'package:go_router/go_router.dart'; // For navigation
+import '../../../core/constants/app_constants.dart'; // For routes
+import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
 
-class ServerFailure extends Failure {
-  ServerFailure({String? message = 'Server error'})
-      : super(message: message ?? 'Server error');
-}
+// Assuming CameraService and its provider are defined elsewhere
+// import 'package:final_project/core/services/camera_service.dart';
+// final cameraServiceProvider = Provider<CameraService>((ref) => CameraService());
 
-class CacheFailure extends Failure {
-  CacheFailure({String? message = 'Cache error'})
-      : super(message: message ?? 'Cache error');
-}
+// Assuming SubmitPhotoAnswerUseCase and its provider are defined elsewhere
+// import 'package:final_project/domain/usecases/submit_photo_answer_usecase.dart';
+// final submitPhotoAnswerUseCaseProvider = Provider<SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams>>(...);
 
-class UnexpectedFailure extends Failure {
-  UnexpectedFailure({String? message = 'Unexpected error'})
-      : super(message: message ?? 'Unexpected error');
-}
 
-// 3. UseCase Interface
-abstract class UseCase<Type, Params> {
-  Future<Either<Failure, Type>> call(Params params);
-}
-
-// 4.  ParamFutureUseCase Interface
-abstract class ParamFutureUseCase<Type, Params> {
-  Future<Either<Failure, Type>> call(Params params);
-}
-
-// 5. Define Parameters Class
-class SubmitPhotoAnswerParams {
-  final String questId;
-  final String imagePath;
-
-  SubmitPhotoAnswerParams({required this.questId, required this.imagePath});
-}
-
-// 6. Define UseCase
-class SubmitPhotoAnswerUseCase
-    implements UseCase<void, SubmitPhotoAnswerParams> {
-  final QuestRepository _questRepository;
-
-  SubmitPhotoAnswerUseCase({required QuestRepository questRepository})
-      : _questRepository = questRepository;
-
-  @override
-  Future<Either<Failure, void>> call(SubmitPhotoAnswerParams params) async {
-    try {
-      // Call the repository's uploadPhoto method
-      await _questRepository.uploadPhoto(params.questId, params.imagePath);
-      return const Right(null); // Indicate success
-    } on Failure catch (failure) {
-      //convert to Failure
-      return Left(failure);
-    } catch (e) {
-      return Left(UnexpectedFailure(
-          message: 'An unexpected error occurred: $e')); // Handle other errors
-    }
-  }
-}
-
-// 7. Abstract Repository
-abstract class QuestRepository {
-  Future<void> uploadPhoto(String questId, String imagePath);
-  // Add other repository methods as needed
-}
-
-// 8.  *Mock* Repository Implementation (for testing)
-class MockQuestRepository implements QuestRepository {
-  @override
-  Future<void> uploadPhoto(String questId, String imagePath) async {
-    // Simulate a successful upload
-    await Future.delayed(
-        const Duration(milliseconds: 500)); // Simulate network delay
-
-    // In a real implementation, you'd handle actual upload logic and potential errors
-    //  (e.g., using try-catch and returning Left(Failure) on error).
-
-    if (imagePath.contains('error')) {
-      //Simulate error
-      throw ServerFailure(message: "Simulated server error during upload");
-    }
-    return Future.value(); // Return a completed Future<void> for success
-  }
-}
-
-// 9. Camera Service (Simplified for this example)
-class CameraService {
-  final ImagePicker _picker = ImagePicker();
-
-  Future<XFile?> pickImage(ImageSource source) async {
-    final pickedFile = await _picker.pickImage(source: source);
-    return pickedFile;
-  }
-}
-
-// 10.  Providers
-final cameraServiceProvider = Provider<CameraService>((ref) => CameraService());
-
-// Use the MockQuestRepository here.  In your real app, you'd use your actual implementation.
-final questRepositoryProvider =
-    Provider<QuestRepository>((ref) => MockQuestRepository());
-
-final submitPhotoAnswerUseCaseProvider = Provider<SubmitPhotoAnswerUseCase>(
-  (ref) => SubmitPhotoAnswerUseCase(
-    questRepository: ref.read(questRepositoryProvider),
-  ),
-);
-
-// 11. PhotoChallengeQuestWidget
+// ========================================================================
+// PHOTO CHALLENGE QUEST WIDGET
+// Displays UI for photo challenge and handles submission.
+// ========================================================================
 class PhotoChallengeQuestWidget extends ConsumerStatefulWidget {
-  final q.Quest quest; // Use the domain Quest
+  final q.Quest quest; // Use the domain Quest
 
-  const PhotoChallengeQuestWidget({super.key, required this.quest});
+  const PhotoChallengeQuestWidget({super.key, required this.quest});
 
-  @override
-  ConsumerState<PhotoChallengeQuestWidget> createState() =>
-      _PhotoChallengeQuestWidgetState();
+  @override
+  ConsumerState<PhotoChallengeQuestWidget> createState() =>
+      _PhotoChallengeQuestWidgetState();
 }
-
-//class PhotoChallengeQuest extends q.Quest {  // Remove this
-//  final String? photoTheme;
-//
-//  PhotoChallengeQuest({
-//    required super.id,
-//    required super.type,
-//    required super.title,
-//    super.description,
-//    required this.photoTheme,
-//  });
-//}
 
 class _PhotoChallengeQuestWidgetState
-    extends ConsumerState<PhotoChallengeQuestWidget> {
-  File? _pickedImage;
+    extends ConsumerState<PhotoChallengeQuestWidget> {
+  File? _pickedImage;
+  bool _isPickingImage = false;
+  bool _isSubmitting = false;
 
-  Future<void> _pickImage() async {
-    final pickedFile =
-        await ref.read(cameraServiceProvider).pickImage(ImageSource.camera);
-    if (pickedFile != null) {
-      setState(() {
-        _pickedImage = File(pickedFile.path);
-      });
-    }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    final submitPhotoUseCase = ref.read(submitPhotoAnswerUseCaseProvider);
+  Future<void> _pickImage() async {
+    if (_isPickingImage) return;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Capture a photo for the challenge:',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: _pickImage,
-          child: const Text('Take Photo'),
-        ),
-        const SizedBox(height: 16),
-        if (_pickedImage != null) ...[
-          SizedBox(
-            height: 150,
-            width: double.infinity,
-            child: Image.file(
-              _pickedImage!,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () async {
-              if (_pickedImage != null) {
-                final result = await submitPhotoUseCase(
-                  SubmitPhotoAnswerParams(
-                    questId: widget.quest.id ?? '',
-                    imagePath: _pickedImage!.path,
-                  ),
-                );
-                result.fold(
-                  (failure) => _showError(context, failure),
-                  (success) => _showSuccess(context),
-                );
-              } else {
-                _showInputError(context);
-              }
-            },
-            child: const Text('Submit Photo'),
-          ),
-        ],
-      ],
-    );
-  }
+    setState(() {
+      _isPickingImage = true;
+      _pickedImage = null; // Clear previous image
+    });
+    try {
+      // You might offer a choice between camera and gallery
+      final pickedFile =
+          await ref.read(cameraServiceProvider).pickImage(ImageSource.camera);
+      if (pickedFile != null) {
+        setState(() {
+          _pickedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      // Handle potential errors during image picking (e.g., permissions)
+      print('Error picking image: $e');
+      _showError(context, Failure(message: 'Failed to pick image: ${e.toString()}'));
+    } finally {
+      setState(() {
+        _isPickingImage = false;
+      });
+    }
+  }
 
-  void _showError(BuildContext context, Failure failure) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error: ${failure.message}'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    final submitPhotoUseCase = ref.read(submitPhotoAnswerUseCaseProvider);
 
-  void _showSuccess(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Photo submitted!')),
-    );
-    setState(() {
-      _pickedImage = null;
-    });
-  }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Capture a photo for the challenge:',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        ElevatedButton(
+          onPressed: _isPickingImage ? null : _pickImage, // Disable while picking
+          child: _isPickingImage
+              ? const SizedBox( // Show spinner when picking
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                )
+              : const Text('Take Photo'),
+        ),
+        const SizedBox(height: 16),
+        if (_pickedImage != null) ...[
+          SizedBox(
+            height: 200, // Increased height for better preview
+            width: double.infinity,
+            child: Image.file(
+              _pickedImage!,
+              fit: BoxFit.contain, // Use contain to show the full image
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _isSubmitting ? null : () => _handleSubmit(context, ref, submitPhotoUseCase), // Disable while submitting
+            child: _isSubmitting
+                  ? const SizedBox( // Show spinner when submitting
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : const Text('Submit Photo'),
+          ),
+        ],
+      ],
+    );
+  }
 
-  void _showInputError(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please take a photo first.')),
-    );
-  }
+  Future<void> _handleSubmit(
+    BuildContext context,
+    WidgetRef ref, // Added ref to access AuthProvider
+    SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams> submitPhotoUseCase, // Use the specific type
+  ) async {
+    if (_pickedImage == null) {
+      _showInputError(context);
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true; // Set submitting state
+    });
+
+    // Get the actual logged-in user's ID from AuthProvider
+    final authProvider = ref.read(authProvider); // Assuming authProvider is a Riverpod provider
+    final userId = authProvider.currentUser?.id;
+
+    if (userId == null) {
+      _showError(context, const Failure(message: 'User not logged in. Cannot submit.'));
+      setState(() { _isSubmitting = false; });
+      return;
+    }
+
+
+    final params = SubmitPhotoAnswerParams(
+      questId: widget.quest.id ?? '',
+      imagePath: _pickedImage!.path,
+      userId: userId,
+    );
+
+    final result = await submitPhotoUseCase(params);
+
+    result.fold(
+      (failure) {
+        _showError(context, failure);
+      },
+      (submissionResult) { // Use the QuestSubmissionResult from the service
+        _showSuccess(context);
+        // Navigate to QuestResultScreen with the result data
+        GoRouter.of(context).go(AppConstants.questResultRoute, extra: {
+          'isSuccessful': submissionResult.isSuccessful,
+          'pointsEarned': submissionResult.pointsEarned,
+          'feedbackMessage': submissionResult.feedbackMessage,
+          'newBadges': submissionResult.newBadges,
+        });
+
+        // TODO: Optionally trigger a profile refresh if needed, although backend update + stream should handle this
+        // ref.read(profileProvider.notifier).getUserProfile(userId); // Example if ProfileProvider has a notifier
+      },
+    );
+
+    setState(() {
+      _isSubmitting = false; // Reset submitting state
+    });
+  }
+
+
+  void _showError(BuildContext context, Failure failure) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: ${failure.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showSuccess(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Photo submitted!')),
+    );
+    // Optionally clear the picked image after successful submission
+    setState(() {
+      _pickedImage = null;
+    });
+  }
+
+  void _showInputError(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please take a photo first.')),
+    );
+  }
 }
-
-//class PhotoChallengeQuestAdapter extends q.Quest {  // Removed Adapter
-//  final q.Quest _quest;
-//
-//  PhotoChallengeQuestAdapter(this._quest)
-//      : super(
-//          id: _quest.id,
-//          type: _quest.type,
-//          title: _quest.title,
-//          description: _quest.description,
-//          question: _quest.question,
-//          options: _quest.options,
-//          correctAnswer: _quest.correctAnswer,
-//          locationName: _quest.locationName,
-//          latitude: _quest.latitude,
-//          longitude: _quest.longitude,
-//          photoTheme: _quest.photoTheme, // Pass photoTheme
-//          timeLimitSeconds: _quest.timeLimitSeconds,
-//          startTime: _quest.startTime,
-//        );
-//  // Adapt any other properties needed by PhotoChallengeQuestWidget
-//}

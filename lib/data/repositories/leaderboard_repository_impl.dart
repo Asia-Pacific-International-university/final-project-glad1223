@@ -1,59 +1,96 @@
+// data/repositories/leaderboard_repository_impl.dart
 import 'package:dartz/dartz.dart';
 import '../../domain/entities/leaderboard_entry.dart';
 import '../../domain/repositories/leaderboard_repositories.dart';
 import '../../core/error/failures.dart';
-import '../datasources/remote/api_client.dart'; // Assuming you have an ApiClient
-//import '../models/leaderboard_model.dart'; // Assuming you have a LeaderboardModel (or directly use List<LeaderboardEntry>)
+import '../datasources/remote/leaderboard_remote_datasource.dart'; // Import your Firestore data source
+import '../models/faculty_model.dart'; // Import your FacultyModel
 
 class LeaderboardRepositoryImpl implements LeaderboardRepositories {
-  final ApiClient _apiClient;
+  final LeaderboardRemoteDataSource _remoteDataSource; // Changed dependency
 
-  LeaderboardRepositoryImpl(this._apiClient);
+  LeaderboardRepositoryImpl(
+      this._remoteDataSource); // Constructor now takes remoteDataSource
 
-  // Assuming your API provides a stream of leaderboard data (e.g., using WebSockets)
   @override
   Stream<Either<Failure, List<LeaderboardEntry>>> getLeaderboardStream() {
     try {
-      // Replace with your actual stream implementation
-      return _apiClient.getLeaderboardStream('/leaderboard').map((event) {
-        // Assuming the event contains a list of leaderboard data
-        if (event is List) {
-          final leaderboardEntries = (event as List<dynamic>)
-              .map((json) =>
-                  LeaderboardEntry.fromJson(json as Map<String, dynamic>))
-              .toList();
-          return Right<Failure, List<LeaderboardEntry>>(leaderboardEntries);
-        } else {
-          return Left<Failure, List<LeaderboardEntry>>(
-            ServerFailure(
-                'Invalid data: Invalid leaderboard data format'), // Corrected: Single positional argument
-          );
+      final stream = _remoteDataSource
+          .getFacultyLeaderboardStream(); // Use Firestore stream
+      return stream.map((facultyModels) {
+        final leaderboardEntries = facultyModels
+            .map((model) => LeaderboardEntry.fromFacultyModel(
+                model)) // Map FacultyModel to LeaderboardEntry
+            .toList();
+        return Right(leaderboardEntries);
+      }).handleError((e) {
+        // Handle errors from the stream itself
+        if (e is FirebaseException) {
+          return Left(ServerFailure('Firestore Error: ${e.message}'));
         }
+        return Left(ServerFailure('Unknown error getting stream: $e'));
       });
     } catch (e) {
-      return Stream.value(Left(ServerFailure(
-          'Stream error: Error fetching leaderboard stream: $e'))); // Corrected: Single positional argument
+      return Stream.value(
+          Left(ServerFailure('Error setting up leaderboard stream: $e')));
     }
   }
 
   @override
   Future<Either<Failure, List<LeaderboardEntry>>> fetchLeaderboard() async {
     try {
-      final leaderboardData = await _apiClient
-          .get('/leaderboard'); // Replace with your API endpoint
-      if (leaderboardData is List) {
-        final leaderboardEntries = (leaderboardData as List<dynamic>)
-            .map((json) =>
-                LeaderboardEntry.fromJson(json as Map<String, dynamic>))
+      final facultyModels = await _remoteDataSource
+          .getFacultyLeaderboardSnapshot(); // Use Firestore snapshot
+      final leaderboardEntries = facultyModels
+          .map((model) => LeaderboardEntry.fromFacultyModel(model))
+          .toList();
+      return Right(leaderboardEntries);
+    } on FirebaseException catch (e) {
+      return Left(ServerFailure('Firestore Error: ${e.message}'));
+    } catch (e) {
+      return Left(ServerFailure('Error fetching leaderboard: $e'));
+    }
+  }
+
+  // --- Implement new methods for specific leaderboards ---
+  @override
+  Stream<Either<Failure, List<LeaderboardEntry>>>
+      getFastestLeaderboardStream() {
+    try {
+      final stream = _remoteDataSource.getFastestCompletionLeaderboardStream();
+      return stream.map((facultyModels) {
+        final leaderboardEntries = facultyModels
+            .map((model) => LeaderboardEntry.fromFacultyModel(model))
             .toList();
         return Right(leaderboardEntries);
-      } else {
-        return Left(ServerFailure(
-            'Invalid data: Invalid leaderboard data format')); // Corrected: Single positional argument
-      }
+      }).handleError((e) {
+        if (e is FirebaseException) {
+          return Left(ServerFailure('Firestore Error: ${e.message}'));
+        }
+        return Left(ServerFailure('Unknown error getting fastest stream: $e'));
+      });
     } catch (e) {
-      return Left(ServerFailure(
-          'Fetch error: Error fetching leaderboard: $e')); // Corrected: Single positional argument
+      return Stream.value(Left(
+          ServerFailure('Error setting up fastest leaderboard stream: $e')));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<LeaderboardEntry>>>
+      getAccuracyLeaderboardSnapshot() async {
+    try {
+      // Assuming you have a method like getAccuracyLeaderboardSnapshot in remoteDataSource
+      final facultyModels = await _remoteDataSource
+          .getAccuracyLeaderboardStream()
+          .first; // Get one snapshot from stream
+      final leaderboardEntries = facultyModels
+          .map((model) => LeaderboardEntry.fromFacultyModel(model))
+          .toList();
+      return Right(leaderboardEntries);
+    } on FirebaseException catch (e) {
+      return Left(ServerFailure('Firestore Error: ${e.message}'));
+    } catch (e) {
+      return Left(ServerFailure('Error fetching accuracy leaderboard: $e'));
     }
   }
 }

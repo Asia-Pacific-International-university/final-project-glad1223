@@ -72,3 +72,8 @@ class CameraPermissionDeniedFailure extends Failure {
       {String message = 'Camera permission denied'})
       : super(message: message);
 }
+
+class IncorrectAnswerFailure extends Failure {
+  const IncorrectAnswerFailure({required String message})
+      : super(message: message);
+}
