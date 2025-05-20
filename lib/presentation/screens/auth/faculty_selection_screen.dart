@@ -1,50 +1,50 @@
-// lib/presentation/screens/auth/faculty_selection_screen.dart
-
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../core/constants/app_constants.dart'; // Import constants for faculty list
-import '../../providers/auth_provider.dart'; // Import AuthProvider
-import '../../widgets/common/themed_button.dart'; // Assuming this exists
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
+import 'package:go_router/go_router.dart'; // For navigation
+import '../../../core/constants/app_constants.dart';
+import '../../providers/auth_provider.dart'; // Import Riverpod auth provider
+import '../../widgets/common/themed_button.dart';
 
-class FacultySelectionScreen extends StatefulWidget {
-  const FacultySelectionScreen({Key? key}) : super(key: key);
+class FacultySelectionScreen extends ConsumerStatefulWidget {
+  // Changed to ConsumerStatefulWidget
+  const FacultySelectionScreen({super.key});
 
   @override
-  _FacultySelectionScreenState createState() => _FacultySelectionScreenState();
+  ConsumerState<FacultySelectionScreen> createState() =>
+      _FacultySelectionScreenState(); // Changed state type
 }
 
-class _FacultySelectionScreenState extends State<FacultySelectionScreen> {
+class _FacultySelectionScreenState
+    extends ConsumerState<FacultySelectionScreen> {
+  // Changed state type
   String? _selectedFacultyId;
-  // Use the faculty list from AppFaculties constants
-  final List<MapEntry<String, String>> _facultyList =
-      AppFaculties.facultyList; // Use the static getter
+  final List<MapEntry<String, String>> _facultyList = AppFaculties.facultyList;
 
   @override
   void initState() {
     super.initState();
-    // Add a post-frame callback to check redirection logic immediately after the build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkRedirect();
     });
   }
 
   void _checkRedirect() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // Read the current auth state from the provider
+    final authState = ref.read(authProvider);
+    final authNotifier = ref.read(authProvider.notifier);
+
     // If user is not logged in OR doesn't need faculty selection, redirect away
-    if (authProvider.currentUser == null ||
-        !authProvider.requiresFacultySelection()) {
+    if (authState.user == null || !authNotifier.requiresFacultySelection()) {
       print(
-          'FacultySelectionScreen: Redirecting. User null: ${authProvider.currentUser == null}, Needs selection: ${authProvider.requiresFacultySelection()}');
-      // Redirect to home or login - Home is likely correct if they somehow got here when they shouldn't have
-      Navigator.of(context)
-          .pushReplacementNamed('/home'); // Use your AppRouter route
+          'FacultySelectionScreen: Redirecting. User null: ${authState.user == null}, Needs selection: ${authNotifier.requiresFacultySelection()}');
+      GoRouter.of(context)
+          .go(AppConstants.homeRoute); // Use GoRouter for redirection
     } else {
       print('FacultySelectionScreen: User needs faculty selection.');
     }
   }
 
   void _selectFaculty() async {
-    // Validate that a faculty is selected
     if (_selectedFacultyId == null || _selectedFacultyId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select your faculty')),
@@ -52,54 +52,48 @@ class _FacultySelectionScreenState extends State<FacultySelectionScreen> {
       return;
     }
 
-    // Get the AuthProvider and current user
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final currentUser = authProvider.currentUser;
+    final authNotifier = ref.read(authProvider.notifier);
+    final currentUser =
+        ref.read(authProvider).user; // Read current user from state
 
-    // Double check user is still logged in and needs faculty
-    if (currentUser == null || !authProvider.requiresFacultySelection()) {
+    if (currentUser == null || !authNotifier.requiresFacultySelection()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content:
                 Text('Error: User session invalid or faculty already set.')),
       );
-      Navigator.of(context)
-          .pushReplacementNamed('/login'); // Go back to login/splash
+      GoRouter.of(context).go(AppConstants.loginRoute); // Use GoRouter
       return;
     }
 
-    // Call the AuthProvider method to update the user's faculty
-    final success = await authProvider.updateUserFaculty(
+    final success = await authNotifier.updateUserFaculty(
       userId: currentUser.id,
       facultyId: _selectedFacultyId!,
     );
 
-    // Check the result of the update operation
     if (success) {
       print('Faculty updated successfully!');
-      // Navigate to the Home Screen upon success
-      Navigator.of(context)
-          .pushReplacementNamed('/home'); // Use your AppRouter route
+      GoRouter.of(context).go(AppConstants.homeRoute); // Use GoRouter
     } else {
-      // Show error message if update failed
-      print('Faculty update failed: ${authProvider.errorMessage}');
+      final errorMessage =
+          ref.read(authProvider).errorMessage; // Read error message from state
+      print('Faculty update failed: $errorMessage');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text(authProvider.errorMessage ?? 'Failed to update faculty')),
+        SnackBar(content: Text(errorMessage ?? 'Failed to update faculty')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Use a Consumer or check authProvider.isLoading for the button
-    final authProvider = Provider.of<AuthProvider>(context);
+    // Watch the relevant parts of the AuthState
+    final authState = ref.watch(authProvider);
+    final isLoading = authState.isLoading;
+    final requiresFacultySelection =
+        ref.watch(requiresFacultySelectionProvider); // Use helper provider
 
     // Show a loading/empty screen briefly while _checkRedirect runs
-    // Also prevent building the main UI if the user shouldn't be here
-    if (authProvider.currentUser == null ||
-        !authProvider.requiresFacultySelection()) {
+    if (authState.user == null || !requiresFacultySelection) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -109,7 +103,6 @@ class _FacultySelectionScreenState extends State<FacultySelectionScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Center(
           child: SingleChildScrollView(
-            // Add SingleChildScrollView
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -126,8 +119,8 @@ class _FacultySelectionScreenState extends State<FacultySelectionScreen> {
                   value: _selectedFacultyId,
                   items: _facultyList.map((entry) {
                     return DropdownMenuItem<String>(
-                      value: entry.key, // Use ID as value
-                      child: Text(entry.value), // Display Name
+                      value: entry.key,
+                      child: Text(entry.value),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -144,15 +137,10 @@ class _FacultySelectionScreenState extends State<FacultySelectionScreen> {
                   hint: const Text('Choose a Faculty'),
                 ),
                 const SizedBox(height: 24),
-                // Use a Consumer for the button to react to the provider's loading state
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    return ThemedButton(
-                      text: 'Confirm Faculty',
-                      onPressed: authProvider.isLoading ? null : _selectFaculty,
-                      isLoading: authProvider.isLoading,
-                    );
-                  },
+                ThemedButton(
+                  text: 'Confirm Faculty',
+                  onPressed: isLoading ? null : _selectFaculty,
+                  isLoading: isLoading,
                 ),
               ],
             ),

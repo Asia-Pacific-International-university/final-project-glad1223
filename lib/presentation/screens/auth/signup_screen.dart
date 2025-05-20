@@ -1,22 +1,25 @@
-// *** lib/presentation/screens/auth/signup_screen.dart ***
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
+import 'package:go_router/go_router.dart'; // For navigation
 import '../../../domain/entities/user.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart'; // Import Riverpod auth provider
 import '../../../core/constants/app_constants.dart';
 import '../../widgets/common/themed_button.dart';
 import '../../widgets/common/loading_indicator.dart';
 
-class SignUpScreen extends StatefulWidget {
+class SignUpScreen extends ConsumerStatefulWidget {
+  // Changed to ConsumerStatefulWidget
   static const routeName = '/signup';
 
-  const SignUpScreen({Key? key}) : super(key: key);
+  const SignUpScreen({super.key});
 
   @override
-  _SignUpScreenState createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() =>
+      _SignUpScreenState(); // Changed state type
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
+  // Changed state type
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -35,28 +38,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (_formKey.currentState!.validate()) {
       FocusScope.of(context).unfocus();
 
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-      final signedUpUser = await authProvider.signUp(
+      // Access the AuthNotifier to call methods
+      final authNotifier = ref.read(authProvider.notifier);
+      await authNotifier.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         username: _usernameController.text.trim(),
         role: _selectedRole,
       );
 
-      if (signedUpUser != null) {
-        print('User signed up successfully: ${signedUpUser.username}');
-        if (authProvider.requiresFacultySelection()) {
+      // Read the current auth state after the signup attempt
+      final authState = ref.read(authProvider);
+
+      if (authState.user != null) {
+        print('User signed up successfully: ${authState.user!.username}');
+        if (authNotifier.requiresFacultySelection()) {
+          // Use notifier's helper method
           print('Navigating to Faculty Selection Screen...');
-          Navigator.of(context).pushReplacementNamed('/auth/faculty_selection');
+          GoRouter.of(context).pushReplacement(
+              AppConstants.facultySelectionRoute); // Use GoRouter
         } else {
-          Navigator.of(context).pushReplacementNamed('/home');
+          GoRouter.of(context)
+              .pushReplacement(AppConstants.homeRoute); // Use GoRouter
         }
-      } else if (authProvider.errorMessage != null &&
-          authProvider.errorMessage!.isNotEmpty) {
+      } else if (authState.errorMessage != null &&
+          authState.errorMessage!.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(authProvider.errorMessage ??
+              content: Text(authState.errorMessage ??
                   'An unknown error occurred during signup')),
         );
       }
@@ -65,6 +74,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the loading state from the authProvider
+    final isLoading =
+        ref.watch(authProvider.select((state) => state.isLoading));
+    final errorMessage =
+        ref.watch(authProvider.select((state) => state.errorMessage));
+
+    // Optional: Listen for error messages and show SnackBar immediately
+    ref.listen<String?>(authErrorMessageProvider, (previous, next) {
+      if (next != null && next.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next)),
+        );
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: const Text('Sign Up')),
       body: Center(
@@ -162,19 +186,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    return ThemedButton(
-                      text: 'Sign Up',
-                      onPressed: authProvider.isLoading ? null : _signUp,
-                      isLoading: authProvider.isLoading,
-                    );
-                  },
+                // Use the isLoading provider directly
+                ThemedButton(
+                  text: 'Sign Up',
+                  onPressed: isLoading ? null : _signUp,
+                  isLoading: isLoading,
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
-                    Navigator.of(context).pushReplacementNamed('/login');
+                    GoRouter.of(context).pushReplacement(
+                        AppConstants.loginRoute); // Use GoRouter
                   },
                   child: const Text('Already have an account? Log in'),
                 ),

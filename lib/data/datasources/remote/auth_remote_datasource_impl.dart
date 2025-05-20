@@ -1,4 +1,3 @@
-// *** lib/data/datasources/remote/auth_remote_datasource_impl.dart ***
 import 'package:http/http.dart'
     as http; // Import if you still need it for other API calls
 import 'package:firebase_auth/firebase_auth.dart'
@@ -8,20 +7,23 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/error/exceptions.dart';
 import '../../models/user_model.dart';
 import 'auth_remote_datasource.dart';
-import 'api_client.dart';
+// import 'api_client.dart'; // ApiClient is no longer directly used here, removed if not needed elsewhere
 import 'dart:async';
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  final ApiClient? apiClient;
-  final firebase_auth.FirebaseAuth _firebaseAuth =
-      firebase_auth.FirebaseAuth.instance; // Use Firebase Auth
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance; // Use Firestore
+  // final ApiClient? apiClient; // Removed if not used
+  final firebase_auth.FirebaseAuth _firebaseAuth; // Now a dependency
+  final FirebaseFirestore _firestore; // Now a dependency
 
-  AuthRemoteDataSourceImpl({this.apiClient}) {
-    print(
-        "AuthRemoteDataSourceImpl initialized with API Client: ${apiClient != null}");
-  }
+  AuthRemoteDataSourceImpl({
+    required firebase_auth.FirebaseAuth firebaseAuth,
+    required FirebaseFirestore firestore,
+    // this.apiClient // Removed if not used
+  })  : _firebaseAuth = firebaseAuth,
+        _firestore = firestore;
+  // {
+  //   print("AuthRemoteDataSourceImpl initialized with API Client: ${apiClient != null}");
+  // }
 
   @override
   Future<UserModel> signUpWithEmailAndPassword({
@@ -259,7 +261,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             'The email address is already in use by another account.');
       case 'operation-not-allowed':
         return AuthenticationException(
-            'Operation not allowed.  Please enable email sign-in in the Firebase Console.');
+            'Operation not allowed. Please enable email sign-in in the Firebase Console.');
       case 'weak-password':
         return AuthenticationException('The password is too weak.');
       default:

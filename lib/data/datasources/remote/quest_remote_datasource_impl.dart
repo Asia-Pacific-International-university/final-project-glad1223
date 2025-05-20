@@ -29,18 +29,12 @@ class QuestRemoteDataSourceImpl implements QuestRemoteDataSource {
 
   @override
   Future<String> submitTriviaAnswer(String questId, String answer) async {
-    // Changed to Future<String>
     final response = await client.post(
       Uri.parse('$baseUrl/quests/$questId/trivia'),
-      body: {'answer': answer}, // Ensure your backend expects this format
+      headers: {'Content-Type': 'application/json'}, // Specify content type
+      body: jsonEncode({'answer': answer}), // Encode body as JSON
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
-      // Check for success (200 OK or 201 Created)
-      // Assuming the backend returns a JSON with a message or the response body is the string itself
-      // If backend returns JSON:
-      // final Map<String, dynamic> responseData = jsonDecode(response.body);
-      // return responseData['message'] as String; // Or any relevant string field
-      // If backend returns a plain string or you want to provide a generic success message:
       return response.body.isNotEmpty
           ? response.body
           : "Trivia answer submitted successfully.";
@@ -54,7 +48,8 @@ class QuestRemoteDataSourceImpl implements QuestRemoteDataSource {
   Future<void> submitPollVote(String questId, String optionId) async {
     final response = await client.post(
       Uri.parse('$baseUrl/quests/$questId/poll'),
-      body: {'option_id': optionId},
+      headers: {'Content-Type': 'application/json'}, // Specify content type
+      body: jsonEncode({'option_id': optionId}), // Encode body as JSON
     );
     if (response.statusCode != 200 && response.statusCode != 204) {
       throw Exception(
@@ -67,10 +62,11 @@ class QuestRemoteDataSourceImpl implements QuestRemoteDataSource {
       String questId, double latitude, double longitude) async {
     final response = await client.post(
       Uri.parse('$baseUrl/quests/$questId/location'),
-      body: {
+      headers: {'Content-Type': 'application/json'}, // Specify content type
+      body: jsonEncode({
         'latitude': latitude.toString(),
         'longitude': longitude.toString()
-      },
+      }), // Encode body as JSON
     );
     if (response.statusCode != 200 && response.statusCode != 204) {
       throw Exception(
@@ -88,7 +84,6 @@ class QuestRemoteDataSourceImpl implements QuestRemoteDataSource {
     final response = await http.Response.fromStream(streamedResponse);
     if (response.statusCode == 200 || response.statusCode == 201) {
       final json = jsonDecode(response.body);
-      // Adjust 'imageUrl' based on your actual backend response structure
       if (json['imageUrl'] != null) {
         return json['imageUrl'] as String;
       } else {
@@ -99,5 +94,23 @@ class QuestRemoteDataSourceImpl implements QuestRemoteDataSource {
       throw Exception(
           'Failed to upload photo. Status: ${response.statusCode}, Body: ${response.body}');
     }
+  }
+
+  @override
+  Future<void> submitMiniPuzzleAnswer(String questId, String answer) async {
+    // This is a placeholder. Implement actual API call if your backend supports it.
+    print(
+        'QuestRemoteDataSourceImpl: Simulating mini-puzzle answer submission for $questId with answer $answer');
+    await Future.delayed(
+        const Duration(milliseconds: 500)); // Simulate network delay
+    // For now, assume success. In a real app, you'd make an http call.
+    // final response = await client.post(
+    //   Uri.parse('$baseUrl/quests/$questId/mini-puzzle'),
+    //   headers: {'Content-Type': 'application/json'},
+    //   body: jsonEncode({'answer': answer}),
+    // );
+    // if (response.statusCode != 200 && response.statusCode != 204) {
+    //   throw Exception('Failed to submit mini-puzzle answer: ${response.body}');
+    // }
   }
 }

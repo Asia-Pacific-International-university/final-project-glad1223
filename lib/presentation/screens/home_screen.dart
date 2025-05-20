@@ -1,55 +1,42 @@
-// *** File: lib/presentation/screens/home/home_screen.dart ***
-
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart'; // Import auth provider
-import '../settings_screen.dart'; // Import settings screen route
-import '../../widgets/app_drawer.dart'; // Assuming you have an AppDrawer widget
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/auth_provider.dart';
+import '../settings_screen.dart';
+import '../../widgets/app_drawer.dart';
+import '../../../core/constants/app_constants.dart';
 
-// The main screen displayed after successful login.
-// This will likely contain the main navigation (e.g., BottomNavigationBar)
-// to access Leaderboard, Profile, Quests, etc.
-class HomeScreen extends StatelessWidget {
-  static const routeName = '/home'; // Route name for navigation
+class HomeScreen extends ConsumerWidget {
+  static const routeName = '/home';
 
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Listen to the AuthProvider to react to user changes (like sign-in/out)
-    final authProvider = Provider.of<AuthProvider>(context);
-    final currentUser = authProvider.currentUser;
-    final isAdmin = authProvider.isAdmin(); // Use the helper method
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(authProvider.select((state) => state.user));
+    final isAdmin = ref.watch(
+        authProvider.select((state) => state.user?.role == UserRole.admin));
+    final authNotifier = ref.read(authProvider.notifier);
 
-    // Handle case where user is not logged in (shouldn't happen if route is protected)
     if (currentUser == null) {
-      // Redirect to login or splash screen
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context)
-            .pushReplacementNamed('/login'); // Use your AppRouter
+        Navigator.of(context).pushReplacementNamed(AppConstants.loginRoute);
       });
-      return const Scaffold(
-          body: Center(
-              child:
-                  CircularProgressIndicator())); // Show loading while redirecting
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Campus Pulse'),
-        automaticallyImplyLeading: false, // Don't show back button on home
-        // Add a logout button for testing
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              authProvider.signOut();
-              // Navigate back to login/splash after logout
+            onPressed: () async {
+              await authNotifier.signOut();
               Navigator.of(context)
-                  .pushReplacementNamed('/login'); // Use your AppRouter
+                  .pushReplacementNamed(AppConstants.loginRoute);
             },
           ),
-          // Action button to navigate to Settings
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'Settings',
@@ -59,20 +46,15 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      drawer: const AppDrawer(), // Your app drawer
+      drawer: const AppDrawer(),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text('Welcome, ${currentUser.username}!'),
-            Text(
-                'Your Faculty: ${currentUser.facultyId}'), // Display faculty ID
-            Text(
-                'Total Points: ${currentUser.totalPoints ?? 0}'), // Display points
-
+            Text('Your Faculty: ${currentUser.facultyName ?? 'N/A'}'),
+            Text('Total Points: ${currentUser.totalPoints}'),
             const SizedBox(height: 40),
-
-            // Conditionally display Admin features
             if (isAdmin)
               Column(
                 children: [
@@ -82,49 +64,35 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      // Navigate to Quest Management Screen
-                      // Using your AppRouter:
-                      // Navigator.of(context).pushNamed('/admin/quest_management'); // Replace with actual route
-                      print('Navigate to Quest Management'); // Placeholder
+                      print('Navigate to Quest Management');
                     },
                     child: const Text('Manage Quests'),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
-                      // Navigate to Admin Leaderboard/User Monitoring Screen
-                      // Navigator.of(context).pushNamed('/admin/user_monitoring'); // Replace with actual route
-                      print('Navigate to User Monitoring'); // Placeholder
+                      print('Navigate to User Monitoring');
                     },
-                    child: const Text(
-                        'Monitor Users/Leaderboard'), // Match the privilege description
+                    child: const Text('Monitor Users/Leaderboard'),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
-                      // Navigate to Quest Completion Rate Screen
-                      // Navigator.of(context).pushNamed('/admin/quest_completion_rates'); // Replace with actual route
-                      print(
-                          'Navigate to Quest Completion Rates'); // Placeholder
+                      print('Navigate to Quest Completion Rates');
                     },
-                    child: const Text(
-                        'View Quest Completion Rates'), // Match the privilege description
+                    child: const Text('View Quest Completion Rates'),
                   ),
-                  // Add buttons for Announcements and Faculty List Management if those screens exist
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
-                      // Navigate to Settings for Admins (contains announcements/faculty edit)
-                      // Navigator.of(context).pushNamed('/admin/settings'); // Replace with actual route
-                      print('Navigate to Admin Settings'); // Placeholder
+                      print('Navigate to Admin Settings');
                     },
-                    child: const Text(
-                        'Admin Settings (Announcements, Faculties)'), // Match the privilege description
+                    child:
+                        const Text('Admin Settings (Announcements, Faculties)'),
                   ),
                 ],
               )
             else
-              // Display regular user content
               Column(
                 children: [
                   const Text('Your User Features Here',
@@ -133,27 +101,15 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      // Navigate to Leaderboard
-                      // Navigator.of(context).pushNamed('/leaderboard'); // Replace with actual route
-                      print('Navigate to User Leaderboard'); // Placeholder
+                      print('Navigate to User Leaderboard');
                     },
                     child: const Text('View Leaderboard'),
                   ),
-                  // ... other user features like viewing profile, active quests etc.
                 ],
               ),
           ],
         ),
       ),
-      // Example: Add a BottomNavigationBar later
-      // bottomNavigationBar: BottomNavigationBar(
-      //   items: const [
-      //     BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-      //     BottomNavigationBarItem(icon: Icon(Icons.leaderboard), label: 'Leaderboard'),
-      //     BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-      //   ],
-      //   // Handle navigation between tabs
-      // ),
     );
   }
 }

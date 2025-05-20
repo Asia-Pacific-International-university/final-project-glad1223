@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Assuming Provider is used
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod's ProviderScope
 import 'package:go_router/go_router.dart'; // Import GoRouter
 
 // Firebase imports for FCM
@@ -9,13 +9,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart'; /
 
 // Your existing project imports
 import 'core/navigation/app_router.dart'; // Your AppRouter
-import 'presentation/providers/auth_provider.dart'; // Your AuthProvider
-import 'domain/usecases/sign_up_usecase.dart';
-import 'data/repositories/auth_repository_impl.dart';
-import 'data/datasources/remote/auth_remote_datasource_impl.dart';
-import 'domain/usecases/sign_in_usecase.dart';
-import 'domain/usecases/update_user_faculty_usecase.dart';
-import 'domain/repositories/auth_repository.dart';
+import 'presentation/providers/auth_provider.dart'; // Your Riverpod AuthProvider
+import 'presentation/providers/leaderboard_provider.dart'; // Your Riverpod LeaderboardProvider
+import 'presentation/providers/profile_provider.dart'; // Your Riverpod ProfileProvider
+import 'presentation/providers/quest_provider.dart'; // Your Riverpod QuestProvider
+import 'core/theme/theme_provider.dart'; // Your Riverpod ThemeProvider
+import 'core/theme/app_theme.dart'; // Your AppTheme for light/dark themes
 import 'core/constants/app_constants.dart'; // To use app routes
 
 // ========================================================================
@@ -167,6 +166,8 @@ void main() async {
     // is about a new quest, you might want to trigger a state update in the
     // QuestProvider to load the new quest immediately without requiring a tap.
     // This would involve accessing the QuestProvider instance here.
+    // This is where Riverpod's `container` could be used if you need to access providers
+    // from a non-widget context, but typically this logic goes into a service or provider.
   });
 
   // ======================================================================
@@ -190,50 +191,48 @@ void main() async {
   });
 
   // ======================================================================
-  // 9. DEPENDENCY INJECTION SETUP (Your existing Provider setup)
+  // 9. RIVERPOD PROVIDER SCOPE AND APP RUN
   // ======================================================================
-  final authRemoteDataSource = AuthRemoteDataSourceImpl();
-  final authRepository =
-      AuthRepositoryImpl(remoteDataSource: authRemoteDataSource);
-  final signUpUseCase = SignUpUseCase(authRepository);
-  final signInUseCase = SignInUseCase(authRepository);
-  final updateUserFacultyUseCase = UpdateUserFacultyUseCase(authRepository);
-
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider(
-            signUpUseCase: signUpUseCase,
-            signInUseCase: signInUseCase,
-            updateUserFacultyUseCase: updateUserFacultyUseCase,
-            authRepository: authRepository,
-          )..checkInitialAuthStatus(), // Check initial auth status on startup
-        ),
-        // ... other providers (e.g., for leaderboard, quests)
-      ],
-      child: MyApp(),
+    const ProviderScope(
+      // Replaced MultiProvider with ProviderScope
+      child: MyApp(), // Your root widget
     ),
   );
 }
 
 // ========================================================================
-// 10. MYAPP WIDGET - Root of your UI
+// 10. MYAPP WIDGET - Root of your UI (Now a ConsumerWidget to watch theme)
 // ========================================================================
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
+  // Changed to ConsumerWidget
   // It's good practice to make the router accessible, perhaps via a static instance
   // or by passing it down if dynamic navigation is needed from outside widgets.
   // For GoRouter, often AppRouter itself is designed to be accessible.
   // Making it static here to allow access from FCM listeners in main.dart
   static final GoRouter router = AppRouter().router; // Made router static
 
+  const MyApp({super.key}); // Added const constructor
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Added WidgetRef
+    // Watch the themeMode from the Riverpod themeProvider
+    final themeMode = ref.watch(themeModeProvider);
+
+    // Initialize AuthProvider's initial status check once the app starts
+    // This is a good place to do it, as it's part of the app's initial setup.
+    // Use ref.read to call the notifier method, as we don't need to rebuild MyApp
+    // when the AuthProvider state changes.
+    ref.read(authProvider.notifier).checkInitialAuthStatus();
+
     return MaterialApp.router(
       routerConfig: MyApp.router, // Use the static router
-      title: 'Campus Pulse',
-      // theme: AppTheme.lightTheme, // Uncomment if you have a custom theme
-      debugShowCheckedModeBanner: false, // Set to true for debugging banner
+      title: AppConstants.appName,
+      theme: AppTheme.lightTheme, // Use the light theme
+      darkTheme: AppTheme.darkTheme, // Use the dark theme
+      themeMode: themeMode, // Set theme mode based on Riverpod ThemeProvider
+      debugShowCheckedModeBanner: false, // Hide debug banner
     );
   }
 }

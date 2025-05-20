@@ -1,75 +1,55 @@
-// lib/domain/usecases/sign_up_usecase.dart
-// This file will also contain UpdateUserFacultyUseCase
 import 'package:dartz/dartz.dart';
-import 'package:equatable/equatable.dart';
-import '../../../core/error/failures.dart'; // Ensure failures are imported
-import '../../../core/constants/app_constants.dart'; // Ensure role enum is imported
-import '../entities/user.dart'; // Ensure User entity is imported
-import '../repositories/auth_repositories.dart'; // Ensure repository is imported
-import 'usecase.dart'; // Your base UseCase definition
-
-// SignUp Use Case
-class SignUpParams extends Equatable {
-  final String email;
-  final String password;
-  final String username;
-  final String? facultyId; // Made nullable to align with repository
-  final UserRole role;
-
-  const SignUpParams({
-    required this.email,
-    required this.password,
-    required this.username,
-    this.facultyId, // Made optional
-    required this.role,
-  });
-
-  @override
-  List<Object?> get props => [email, password, username, facultyId, role];
-}
+import '../../core/error/failures.dart';
+import '../../core/usecases/usecase.dart';
+import '../../data/models/user_model.dart'; // Import UserModel
+import '../entities/user.dart'; // Import User entity
+import '../repositories/auth_repository.dart';
+import '../repositories/user_repositories.dart'; // Import UserRepository
 
 class SignUpUseCase implements UseCase<User, SignUpParams> {
-  final AuthRepository repository;
+  final AuthRepository authRepository;
+  final UserRepositories userRepository; // Added UserRepository
 
-  SignUpUseCase(this.repository);
+  SignUpUseCase({
+    required this.authRepository,
+    required this.userRepository, // Initialize UserRepository
+  });
 
   @override
   Future<Either<Failure, User>> call(SignUpParams params) async {
-    return await repository.signUpWithEmailAndPassword(
+    // First, sign up the user with Firebase Authentication
+    final authResult = await authRepository.signUpWithEmailAndPassword(
       email: params.email,
       password: params.password,
-      username: params.username,
+      username:
+          params.username, // Passed to auth for initial user model creation
       facultyId: params.facultyId,
       role: params.role,
     );
-  }
-}
 
-// Update User Faculty Use Case
-class UpdateUserFacultyParams extends Equatable {
-  final String userId;
-  final String facultyId;
-
-  const UpdateUserFacultyParams({
-    required this.userId,
-    required this.facultyId,
-  });
-
-  @override
-  List<Object?> get props => [userId, facultyId];
-}
-
-class UpdateUserFacultyUseCase
-    implements UseCase<User, UpdateUserFacultyParams> {
-  final AuthRepository repository;
-
-  UpdateUserFacultyUseCase(this.repository);
-
-  @override
-  Future<Either<Failure, User>> call(UpdateUserFacultyParams params) async {
-    return await repository.updateUserFaculty(
-      userId: params.userId,
-      facultyId: params.facultyId,
+    return authResult.fold(
+      (failure) => Left(failure), // If auth fails, return the failure
+      (userModel) async {
+        // If auth succeeds, the AuthRemoteDataSourceImpl already created the Firestore user document.
+        // We just need to ensure the returned UserModel is converted to a User entity.
+        return Right(userModel.toDomain());
+      },
     );
   }
+}
+
+class SignUpParams {
+  final String email;
+  final String password;
+  final String username;
+  final UserRole role;
+  final String? facultyId;
+
+  SignUpParams({
+    required this.email,
+    required this.password,
+    required this.username,
+    required this.role,
+    this.facultyId,
+  });
 }

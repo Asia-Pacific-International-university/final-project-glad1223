@@ -1,9 +1,10 @@
 import '../../domain/entities/quest.dart'; // Import the Quest entity
-//import 'package:collection/collection.dart';
 
 class QuestModel {
   final String? id;
   final QuestType? type; // Now correctly using the domain's QuestType
+  final String? title; // Added
+  final String? description; // Added
   final String? question; // For trivia, polls, puzzles
   final List<String>? options; // For trivia, polls
   final String? correctAnswer; // For trivia, puzzles
@@ -17,6 +18,8 @@ class QuestModel {
   QuestModel({
     this.id,
     this.type,
+    this.title, // Initialize
+    this.description, // Initialize
     this.question,
     this.options,
     this.correctAnswer,
@@ -32,6 +35,8 @@ class QuestModel {
     return QuestModel(
       id: json['id'] as String?,
       type: _decodeQuestType(json['type']), // Use a custom decoding function
+      title: json['title'] as String?, // Map new field
+      description: json['description'] as String?, // Map new field
       question: json['question'] as String?,
       options: (json['options'] as List<dynamic>?)?.cast<String>(),
       correctAnswer: json['correctAnswer'] as String?,
@@ -50,6 +55,8 @@ class QuestModel {
     return Quest(
       id: id,
       type: type, // Now these types should match
+      title: title, // Map new field
+      description: description, // Map new field
       question: question,
       options: options,
       correctAnswer: correctAnswer,
@@ -59,6 +66,8 @@ class QuestModel {
       photoTheme: photoTheme,
       timeLimitSeconds: timeLimitSeconds,
       startTime: startTime,
+      // The 'duration' field in Quest entity is derived from timeLimitSeconds,
+      // so it's not passed here.
     );
   }
 
@@ -66,6 +75,8 @@ class QuestModel {
     return {
       'id': id,
       'type': _encodeQuestType(type), // Use a custom encoding function
+      'title': title, // Map new field
+      'description': description, // Map new field
       'question': question,
       'options': options,
       'correctAnswer': correctAnswer,
@@ -115,16 +126,5 @@ String? _encodeQuestType(QuestType? type) {
       return 'miniPuzzle';
     default:
       return null;
-  }
-}
-
-extension CollectionExtension<E> on Iterable<E> {
-  E? firstWhereOrNull(bool Function(E element) test) {
-    for (final element in this) {
-      if (test(element)) {
-        return element;
-      }
-    }
-    return null;
   }
 }

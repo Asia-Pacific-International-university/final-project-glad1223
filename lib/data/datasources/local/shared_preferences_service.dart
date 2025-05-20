@@ -1,70 +1,99 @@
 import 'package:shared_preferences/shared_preferences.dart';
-//import 'package:final_project/core/error/failures.dart';
-import 'dart:convert';
+import 'dart:async';
 
+// ========================================================================
+// SHARED PREFERENCES SERVICE
+// Handles simple key-value storage using SharedPreferences.
+// Suitable for user preferences, settings, flags, etc.
+// ========================================================================
 class SharedPreferencesService {
-  final Future<SharedPreferences> _prefsFuture =
-      SharedPreferences.getInstance();
+  // Use a Future to get the SharedPreferences instance once
+  Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
 
-  Future<String?> getString(String key) async {
-    final prefs = await _prefsFuture;
-    return prefs.getString(key);
+  // Private constructor
+  SharedPreferencesService._privateConstructor();
+
+  // Singleton instance
+  static final SharedPreferencesService _instance =
+      SharedPreferencesService._privateConstructor();
+
+  // Factory constructor to return the singleton instance
+  factory SharedPreferencesService() {
+    return _instance;
   }
 
-  Future<bool> setString(String key, String value) async {
-    final prefs = await _prefsFuture;
-    return prefs.setString(key, value);
+  // --- Methods for storing and retrieving various data types ---
+
+  Future<bool> setBool(String key, bool value) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.setBool(key, value);
   }
 
-  Future<int?> getInt(String key) async {
-    final prefs = await _prefsFuture;
-    return prefs.getInt(key);
+  Future<bool?> getBool(String key) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.getBool(key);
   }
 
   Future<bool> setInt(String key, int value) async {
-    final prefs = await _prefsFuture;
+    final SharedPreferences prefs = await _prefs;
     return prefs.setInt(key, value);
   }
 
+  Future<int?> getInt(String key) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.getInt(key);
+  }
+
+  Future<bool> setDouble(String key, double value) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.setDouble(key, value);
+  }
+
+  Future<double?> getDouble(String key) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.getDouble(key);
+  }
+
+  Future<bool> setString(String key, String value) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.setString(key, value);
+  }
+
+  Future<String?> getString(String key) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.getString(key);
+  }
+
+  Future<bool> setStringList(String key, List<String> value) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.setStringList(key, value);
+  }
+
+  Future<List<String>?> getStringList(String key) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.getStringList(key);
+  }
+
+  // --- Other utility methods ---
+
+  Future<bool> containsKey(String key) async {
+    final SharedPreferences prefs = await _prefs;
+    return prefs.containsKey(key);
+  }
+
   Future<bool> remove(String key) async {
-    final prefs = await _prefsFuture;
+    final SharedPreferences prefs = await _prefs;
     return prefs.remove(key);
   }
 
   Future<bool> clear() async {
-    final prefs = await _prefsFuture;
+    final SharedPreferences prefs = await _prefs;
     return prefs.clear();
   }
 
-  // Example for storing and retrieving a list of strings (e.g., badges)
-  Future<List<String>?> getStringList(String key) async {
-    final prefs = await _prefsFuture;
-    return prefs.getStringList(key);
-  }
-
-  Future<bool> setStringList(String key, List<String> value) async {
-    final prefs = await _prefsFuture;
-    return prefs.setStringList(key, value);
-  }
-
-  // Example for storing and retrieving a complex object as JSON
-  Future<Map<String, dynamic>?> getObject(String key) async {
-    final prefs = await _prefsFuture;
-    final jsonString = prefs.getString(key);
-    if (jsonString != null) {
-      try {
-        return jsonDecode(jsonString) as Map<String, dynamic>?;
-      } catch (e) {
-        print('Error decoding JSON for key: $key - $e');
-        return null;
-      }
-    }
-    return null;
-  }
-
-  Future<bool> setObject(String key, Map<String, dynamic> value) async {
-    final prefs = await _prefsFuture;
-    final jsonString = jsonEncode(value);
-    return prefs.setString(key, jsonString);
-  }
+  // Optional: Initialize method if you need to await instance before first use
+  // Future<void> init() async {
+  //   _prefs = SharedPreferences.getInstance();
+  //   await _prefs; // Await the instance once
+  // }
 }
