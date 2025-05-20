@@ -1,53 +1,42 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-//import 'package:flutter/material.dart';
+// Note: FlutterLocalNotificationsPlugin is managed in main.dart for global display
 
+// ========================================================================
+// NOTIFICATION SERVICE
+// Provides methods to interact with Firebase Messaging (e.g., get FCM token).
+// The main FCM initialization and listeners are handled in main.dart.
+// ========================================================================
 class NotificationService {
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  final FirebaseMessaging _firebaseMessaging;
 
-  Future<void> initialize() async {
-    // Request permission for iOS and web
-    await _firebaseMessaging.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
-    );
+  NotificationService({required FirebaseMessaging firebaseMessaging})
+      : _firebaseMessaging = firebaseMessaging;
 
-    // Get the device's FCM token
-    final fcmToken = await _firebaseMessaging.getToken();
-    print("FCM Token: $fcmToken"); // You'll want to send this to your backend
-
-    // Handle incoming messages while the app is in the foreground
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
-
-      if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-        // You might want to show a local notification here
-      }
-    });
-
-    // Handle when the app is opened from a terminated state
-    FirebaseMessaging.instance
-        .getInitialMessage()
-        .then((RemoteMessage? message) {
-      if (message != null) {
-        print("App opened from terminated state with message: ${message.data}");
-        // Handle the data here, e.g., navigate to a specific screen
-      }
-    });
-
-    // Handle when the app is in the background but not terminated
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  /// Returns the FCM token for the device.
+  /// This token should be sent to your backend to enable targeted notifications.
+  Future<String?> getFCMToken() async {
+    try {
+      final fcmToken = await _firebaseMessaging.getToken();
+      print("NotificationService: Retrieved FCM Token: $fcmToken");
+      return fcmToken;
+    } catch (e) {
+      print("NotificationService: Error getting FCM token: $e");
+      return null;
+    }
   }
+
+  // You can add other methods here if needed, e.g.:
+  // Future<void> subscribeToTopic(String topic) async {
+  //   await _firebaseMessaging.subscribeToTopic(topic);
+  // }
+  //
+  // Future<void> unsubscribeFromTopic(String topic) async {
+  //   await _firebaseMessaging.unsubscribeFromTopic(topic);
+  // }
 }
 
-// This needs to be a top-level function
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print("Handling a background message: ${message.messageId}");
-  // You can perform background tasks here, but UI interaction is limited.
-}
+// The top-level background message handler should remain in main.dart
+// as it needs to be accessible by the Flutter engine directly.
+// Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+//   // ... (This function is in main.dart)
+// }

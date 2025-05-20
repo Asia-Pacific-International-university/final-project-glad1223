@@ -1,9 +1,10 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartz/dartz.dart';
+import 'package:flutter_background_service/flutter_background_service.dart'; // Import background service
 import '../../domain/repositories/leaderboard_repositories.dart';
 import '../../domain/entities/leaderboard_entry.dart';
 import '../../core/error/failures.dart';
-import 'package:rxdart/rxdart.dart'; // For .startWith on streams
+import 'package:rxdart/rxdart.dart';
 
 // Define the LeaderboardState class to hold all leaderboard-related state
 class LeaderboardState {
@@ -11,12 +12,14 @@ class LeaderboardState {
   final List<FacultyRanking> facultyRankingList;
   final bool isLoading;
   final String? errorMessage;
+  final bool isBackgroundUpdating; // New field to indicate background updates
 
   LeaderboardState({
     this.userLeaderboardList = const [],
     this.facultyRankingList = const [],
     this.isLoading = false,
     this.errorMessage,
+    this.isBackgroundUpdating = false, // Initialize
   });
 
   LeaderboardState copyWith({
@@ -24,12 +27,14 @@ class LeaderboardState {
     List<FacultyRanking>? facultyRankingList,
     bool? isLoading,
     String? errorMessage,
+    bool? isBackgroundUpdating,
   }) {
     return LeaderboardState(
       userLeaderboardList: userLeaderboardList ?? this.userLeaderboardList,
       facultyRankingList: facultyRankingList ?? this.facultyRankingList,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage, // Nullable, so pass null explicitly to clear
+      errorMessage: errorMessage,
+      isBackgroundUpdating: isBackgroundUpdating ?? this.isBackgroundUpdating,
     );
   }
 }
@@ -42,19 +47,21 @@ class FacultyRanking {
   FacultyRanking({required this.facultyName, required this.totalScore});
 }
 
-// ========================================================================
+// ---
 // LEADERBOARD NOTIFIER (RIVERPOD STATE NOTIFIER)
 // Manages leaderboard state and logic using Riverpod.
-// ========================================================================
+// ---
 class LeaderboardNotifier extends StateNotifier<LeaderboardState> {
   final LeaderboardRepositories _leaderboardRepository;
 
   LeaderboardNotifier({required LeaderboardRepositories leaderboardRepository})
       : _leaderboardRepository = leaderboardRepository,
-        super(LeaderboardState()); // Initial state
+        super(LeaderboardState()) {
+    // Initialize the background service listener when the notifier is created
+    _initBackgroundListeners();
+  }
 
   // Stream for real-time user leaderboard updates (directly exposed from repository)
-  // This will be watched by the UI directly if needed for real-time updates.
   Stream<Either<Failure, List<LeaderboardEntry>>> get userLeaderboardStream =>
       _leaderboardRepository.getLeaderboardStream();
 
@@ -122,16 +129,56 @@ class LeaderboardNotifier extends StateNotifier<LeaderboardState> {
       },
     );
   }
+
+  /// Initializes the listener for background service updates.
+  void _initBackgroundListeners() {
+    FlutterBackgroundService().on('leaderboard_update').listen((event) {
+      if (event != null) {
+        try {
+          // Indicate that background update is in progress
+          state = state.copyWith(isBackgroundUpdating: true);
+
+          final updatedEntries = _parseLeaderboardEvent(event);
+          state = state.copyWith(
+            userLeaderboardList: updatedEntries,
+            errorMessage:
+                null, // Clear any previous errors on successful update
+            isBackgroundUpdating: false, // Update complete
+          );
+          // Optional: Save to SQLite if needed here
+        } catch (e) {
+          state = state.copyWith(
+            errorMessage: 'Failed to parse background leaderboard update: $e',
+            isBackgroundUpdating: false, // Update complete with error
+          );
+        }
+      }
+    });
+  }
+
+  /// Parses incoming data from the background service into a list of LeaderboardEntry objects.
+  List<LeaderboardEntry> _parseLeaderboardEvent(dynamic event) {
+    // Assuming 'event' is a Map and contains a key 'entries' which is a List
+    // of maps that can be converted to LeaderboardEntry.
+    if (event is Map<String, dynamic> && event.containsKey('entries')) {
+      final List<dynamic> entriesData = event['entries'];
+      return entriesData
+          .map((entry) =>
+              LeaderboardEntry.fromJson(entry as Map<String, dynamic>))
+          .toList();
+    }
+    throw const FormatException(
+        'Invalid leaderboard event format from background service.');
+  }
 }
 
-// ========================================================================
+// ---
 // RIVERPOD PROVIDER DEFINITIONS
-// ========================================================================
+// ---
 
 // The main LeaderboardProvider for Riverpod
 final leaderboardProvider =
     StateNotifierProvider<LeaderboardNotifier, LeaderboardState>((ref) {
-  // Ensure LeaderboardRepositories is also defined as a Riverpod provider
   final leaderboardRepository = ref.watch(leaderboardRepositoryProvider);
   return LeaderboardNotifier(leaderboardRepository: leaderboardRepository);
 });
@@ -153,4 +200,10 @@ final leaderboardLoadingProvider = Provider<bool>((ref) {
 
 final leaderboardErrorMessageProvider = Provider<String?>((ref) {
   return ref.watch(leaderboardProvider.select((state) => state.errorMessage));
+});
+
+// New provider to indicate if background update is occurring
+final leaderboardBackgroundUpdatingProvider = Provider<bool>((ref) {
+  return ref
+      .watch(leaderboardProvider.select((state) => state.isBackgroundUpdating));
 });

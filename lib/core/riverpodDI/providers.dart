@@ -5,11 +5,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sqflite/sqflite.dart'; // For DatabaseHelper dependency
+import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
+import 'package:firebase_messaging/firebase_messaging.dart'; // Import FirebaseMessaging
 
 // Core
 import '../error/failures.dart'; // Ensure Failure is defined here or imported
 import '../services/location_service.dart';
 import '../services/camera_service.dart';
+import '../services/shared_preferences_service.dart'; // Import the SharedPreferencesService
+import '../services/notification_service.dart'; // Import the NotificationService
 
 // Data - Datasources
 import '../../data/datasources/remote/auth_remote_datasource.dart';
@@ -77,6 +81,11 @@ final imagePickerProvider = Provider<ImagePicker>((ref) => ImagePicker());
 final databaseHelperProvider =
     Provider<DatabaseHelper>((ref) => DatabaseHelper());
 
+final sharedPreferencesServiceProvider =
+    Provider<SharedPreferencesService>((ref) {
+  return SharedPreferencesService(); // Returns the singleton instance
+});
+
 final locationServiceProvider = Provider<LocationService>((ref) {
   final geolocator = ref.watch(geolocatorPlatformProvider);
   return LocationService(geolocator: geolocator);
@@ -85,6 +94,14 @@ final locationServiceProvider = Provider<LocationService>((ref) {
 final cameraServiceProvider = Provider<CameraService>((ref) {
   final imagePicker = ref.watch(imagePickerProvider);
   return CameraService(imagePicker: imagePicker);
+});
+
+final firebaseMessagingProvider =
+    Provider<FirebaseMessaging>((ref) => FirebaseMessaging.instance);
+
+final notificationServiceProvider = Provider<NotificationService>((ref) {
+  final firebaseMessaging = ref.watch(firebaseMessagingProvider);
+  return NotificationService(firebaseMessaging: firebaseMessaging);
 });
 
 // ========================================================================
@@ -110,7 +127,7 @@ final questRemoteDataSourceProvider = Provider<QuestRemoteDataSource>((ref) {
 });
 
 // ========================================================================
-// DATA SOURCE PROVIDERS (LOCAL - SQLite)
+// DATA SOURCE PROVIDERS (LOCAL - SQLite & SharedPreferences)
 // ========================================================================
 
 final userLocalDataSourceProvider = Provider<UserLocalDataSource>((ref) {
@@ -138,8 +155,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 final userRepositoryProvider = Provider<UserRepositories>((ref) {
-  final remoteDataSource = ref.watch(
-      authRemoteDataSourceProvider); // Assuming AuthRemoteDataSource handles user profile
+  final remoteDataSource = ref.watch(authRemoteDataSourceProvider);
   final localDataSource = ref.watch(userLocalDataSourceProvider);
   return UserRepositoryImpl(
       remoteDataSource: remoteDataSource, localDataSource: localDataSource);
@@ -165,8 +181,7 @@ final questRepositoryProvider = Provider<QuestRepository>((ref) {
 
 final questSubmissionServiceProvider = Provider<QuestSubmissionService>((ref) {
   final questRepository = ref.watch(questRepositoryProvider);
-  final userRepository = ref.watch(
-      userRepositoryProvider); // QuestSubmissionService needs UserRepository to update points/badges
+  final userRepository = ref.watch(userRepositoryProvider);
   return QuestSubmissionService(
       questRepository: questRepository, userRepository: userRepository);
 });
@@ -178,15 +193,13 @@ final questSubmissionServiceProvider = Provider<QuestSubmissionService>((ref) {
 // Auth Use Cases
 final signUpUseCaseProvider = Provider<SignUpUseCase>((ref) {
   final authRepo = ref.watch(authRepositoryProvider);
-  final userRepo =
-      ref.watch(userRepositoryProvider); // SignUp needs to create user profile
+  final userRepo = ref.watch(userRepositoryProvider);
   return SignUpUseCase(authRepository: authRepo, userRepository: userRepo);
 });
 
 final signInUseCaseProvider = Provider<SignInUseCase>((ref) {
   final authRepo = ref.watch(authRepositoryProvider);
-  final userRepo =
-      ref.watch(userRepositoryProvider); // SignIn needs to fetch user profile
+  final userRepo = ref.watch(userRepositoryProvider);
   return SignInUseCase(authRepository: authRepo, userRepository: userRepo);
 });
 
@@ -224,7 +237,7 @@ final getActiveQuestUseCaseProvider = Provider<GetActiveQuestUseCase>((ref) {
   return GetActiveQuestUseCase(questRepository: repository);
 });
 
-// Quest Submission Use Cases (depend on QuestSubmissionService)
+// Quest Submission Use Cases
 final submitTriviaAnswerUseCaseProvider =
     Provider<SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams>>((ref) {
   final submissionService = ref.watch(questSubmissionServiceProvider);

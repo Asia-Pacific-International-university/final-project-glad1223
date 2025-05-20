@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:final_project/presentation/providers/auth_provider.dart'; // Import Riverpod auth provider
+import 'package:final_project/presentation/providers/auth_provider.dart';
 import 'package:final_project/presentation/widgets/auth/auth_text_field.dart';
 import 'package:final_project/presentation/widgets/common/loading_indicator.dart';
 import 'package:final_project/core/constants/app_constants.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  // Changed to ConsumerStatefulWidget
   static const routeName = '/login';
 
   const LoginScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() =>
-      _LoginScreenState(); // Changed state type
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  // Changed state type
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -32,17 +29,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // Access the AuthNotifier to call methods
       final authNotifier = ref.read(authProvider.notifier);
       await authNotifier.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Watch the state for navigation after the async operation completes
-      // The state is now updated by the notifier, so we can react to it.
-      final authState =
-          ref.read(authProvider); // Read current state after submission attempt
+      final authState = ref.read(authProvider);
 
       if (authState.user != null) {
         GoRouter.of(context).go(AppConstants.homeRoute);
@@ -57,13 +50,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the loading and error state from the authProvider
     final isLoading =
         ref.watch(authProvider.select((state) => state.isLoading));
-    final errorMessage =
-        ref.watch(authProvider.select((state) => state.errorMessage));
+    // final errorMessage = ref.watch(authProvider.select((state) => state.errorMessage)); // Handled by listener
 
-    // Optional: Listen for error messages and show SnackBar immediately
     ref.listen<String?>(authErrorMessageProvider, (previous, next) {
       if (next != null && next.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -87,7 +77,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 Text(
                   'Welcome Back!',
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineMedium, // Good for scaling
                 ),
                 const SizedBox(height: 32),
                 AuthTextField(
@@ -117,14 +109,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                // Use the isLoading provider directly
                 if (isLoading)
                   const LoadingIndicator()
                 else
                   ElevatedButton(
                     onPressed: _submit,
                     style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
+                      minimumSize: const Size(
+                          double.infinity, 50), // Already good tap target
                     ),
                     child: const Text('Login'),
                   ),
@@ -133,6 +125,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: () {
                     GoRouter.of(context).go(AppConstants.signUpRoute);
                   },
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(double.infinity,
+                        48), // Ensure good tap target for TextButton
+                  ),
                   child: const Text('Don\'t have an account? Sign Up'),
                 ),
               ],

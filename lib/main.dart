@@ -1,80 +1,225 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod's ProviderScope
-import 'package:go_router/go_router.dart'; // Import GoRouter
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-// Firebase imports for FCM
+// Firebase imports for FCM and Crashlytics
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // For foreground notifications
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'dart:ui'; // Required for PlatformDispatcher
+
+// Background service imports
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart';
+import 'package:flutter_background_service_ios/flutter_background_service_ios.dart';
+import 'package:geolocator/geolocator.dart'; // For location in background
+import 'package:web_socket_channel/web_socket_channel.dart'; // For WebSocket in background
+import 'dart:async'; // For Timer in background
 
 // Your existing project imports
-import 'core/navigation/app_router.dart'; // Your AppRouter
-import 'presentation/providers/auth_provider.dart'; // Your Riverpod AuthProvider
-import 'presentation/providers/leaderboard_provider.dart'; // Your Riverpod LeaderboardProvider
-import 'presentation/providers/profile_provider.dart'; // Your Riverpod ProfileProvider
-import 'presentation/providers/quest_provider.dart'; // Your Riverpod QuestProvider
-import 'core/theme/theme_provider.dart'; // Your Riverpod ThemeProvider
-import 'core/theme/app_theme.dart'; // Your AppTheme for light/dark themes
-import 'core/constants/app_constants.dart'; // To use app routes
+import 'core/navigation/app_router.dart';
+import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/leaderboard_provider.dart';
+import 'presentation/providers/profile_provider.dart';
+import 'presentation/providers/quest_provider.dart';
+import 'core/theme/theme_provider.dart';
+import 'core/theme/app_theme.dart';
+import 'core/constants/app_constants.dart';
+import 'data/datasources/local/database_helper.dart'; // For local database access in background
+import 'data/datasources/local/user_local_datasource_impl.dart'; // For user data in background
+import 'data/datasources/local/faculty_local_datasource_impl.dart'; // For faculty data in background
+import 'data/datasources/local/quest_local_datasource_impl.dart'; // For quest data in background
 
 // ========================================================================
 // 1. TOP-LEVEL FUNCTION FOR FCM BACKGROUND MESSAGES
-// This function must be a top-level function (not inside a class)
-// and marked with @pragma('vm:entry-point') for Flutter to find it.
-// It runs when a message is received while the app is in the background or terminated.
 // ========================================================================
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Ensure Firebase is initialized for background message handling
   await Firebase.initializeApp();
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
   print("Background Message Handled: ${message.messageId}");
   print("Background Message Data: ${message.data}");
 
   // TODO: Implement logic here to process background quest notifications.
-  // For example, save the quest data to a local database for later retrieval,
-  // or trigger a local notification to alert the user.
-  // This is where you would process `message.data` to extract quest info.
-  // If the message contains a quest, you might want to save its ID or details
-  // so that when the app is opened from the notification, the ActiveQuestScreen
-  // can load the correct quest.
+  // This could involve saving the quest data to SQLite via your local datasources.
+  // Example:
+  // final dbHelper = DatabaseHelper();
+  // final questLocalDataSource = QuestLocalDataSourceImpl(dbHelper);
+  // if (message.data['quest'] != null) {
+  //   final questModel = QuestModel.fromJson(message.data['quest']);
+  //   await questLocalDataSource.saveQuest(questModel);
+  // }
 }
 
 // ========================================================================
 // 2. GLOBAL INSTANCE FOR FLUTTER LOCAL NOTIFICATIONS
-// This plugin is used to display notifications when the app is in the foreground.
 // ========================================================================
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 // ========================================================================
-// 3. MAIN FUNCTION - Entry point of the Flutter application
+// 3. BACKGROUND SERVICE ENTRY POINT
+// This function runs in a separate Isolate when the background service starts.
+// It needs to be a top-level function.
+// ========================================================================
+@pragma('vm:entry-point')
+void onStart(ServiceInstance service) async {
+  // Only call ensureInitialized once per Isolate.
+  // This is crucial for background Isolates.
+  DartPluginRegistrant.ensureInitialized();
+
+  // Initialize Firebase in this background Isolate
+  await Firebase.initializeApp();
+  // Initialize Crashlytics for background errors
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+  // Initialize local notifications for background service if needed to show notifications
+  await flutterLocalNotificationsPlugin.initialize(
+    const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
+    ),
+  );
+
+  // Initialize your database helper and local datasources for background access
+  final dbHelper = DatabaseHelper();
+  final userLocalDataSource = UserLocalDataSourceImpl(dbHelper);
+  final facultyLocalDataSource = FacultyLocalDataSourceImpl(dbHelper);
+  final questLocalDataSource = QuestLocalDataSourceImpl(dbHelper);
+
+  // For Android foreground service notification
+  if (service is AndroidServiceInstance) {
+    service.on('setAsForeground').listen((event) {
+      service.setAsForeground(true);
+    });
+
+    service.on('setAsBackground').listen((event) {
+      service.setAsForeground(false);
+    });
+  }
+
+  // Listen for stop command from the main Isolate
+  service.on('stopService').listen((event) {
+    service.stopSelf();
+  });
+
+  // ======================================================================
+  // BACKGROUND SERVICE LOGIC:
+  // Continuous Location Tracking & Real-time Leaderboard Streaming
+  // ======================================================================
+
+  // --- Location Tracking Placeholder ---
+  // You would typically start location tracking here.
+  // Ensure you have necessary permissions handled in the main app.
+  // This stream will run continuously as long as the service is active.
+  Geolocator.getPositionStream(
+    locationSettings: const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10, // Update every 10 meters
+    ),
+  ).listen((Position position) async {
+    print('Background Location: ${position.latitude}, ${position.longitude}');
+    // TODO: Process location data (e.g., calculate distance for a quest)
+    // Save to local database or send to backend.
+    // Example: service.sendData({'location': {'latitude': position.latitude, 'longitude': position.longitude}});
+  });
+
+  // --- Real-time Leaderboard Streaming Placeholder (WebSocket) ---
+  // Connect to your WebSocket server.
+  // Replace with your actual WebSocket URL
+  final wsUrl = Uri.parse('ws://your-backend-websocket-url/leaderboard');
+  WebSocketChannel? channel;
+
+  void connectWebSocket() {
+    try {
+      channel = WebSocketChannel.connect(wsUrl);
+      print('WebSocket: Attempting to connect to $wsUrl');
+
+      channel?.stream.listen(
+        (message) async {
+          print('WebSocket: Received: $message');
+          // TODO: Process leaderboard update message
+          // Parse message (e.g., JSON), update local SQLite database.
+          // Example:
+          // final Map<String, dynamic> leaderboardData = jsonDecode(message);
+          // await facultyLocalDataSource.saveFaculties(leaderboardData['faculties']);
+          // await userLocalDataSource.saveUsers(leaderboardData['users']); // If you have a saveUsers method
+
+          // Send update to the UI if it's active
+          service.sendData({'leaderboard_update': message});
+        },
+        onDone: () {
+          print('WebSocket: Disconnected. Attempting to reconnect...');
+          // Implement reconnection logic
+          Timer(const Duration(seconds: 5), connectWebSocket);
+        },
+        onError: (error) {
+          print('WebSocket Error: $error');
+          // Implement reconnection logic on error
+          Timer(const Duration(seconds: 5), connectWebSocket);
+        },
+        cancelOnError: true, // Cancel stream on error, then reconnect
+      );
+    } catch (e) {
+      print('WebSocket Connection Error: $e');
+      Timer(const Duration(seconds: 5), connectWebSocket);
+    }
+  }
+
+  connectWebSocket(); // Initial connection
+
+  // --- Example: Send data to the UI periodically (for demonstration) ---
+  Timer.periodic(const Duration(seconds: 10), (timer) async {
+    if (service is AndroidServiceInstance) {
+      // Update foreground notification (Android only)
+      service.setForegroundNotificationInfo(
+        title: "Campus Pulse Background Service",
+        content: "Tracking location and leaderboard updates",
+      );
+    }
+
+    // Example of sending data to the main Isolate
+    service.sendData({
+      "current_timestamp": DateTime.now().toIso8601String(),
+      "is_running": true,
+      // You can send aggregated location data or status here
+    });
+  });
+}
+
+// ========================================================================
+// 4. MAIN FUNCTION - Entry point of the Flutter application
 // ========================================================================
 void main() async {
-  // Ensure Flutter widgets are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase App
   await Firebase.initializeApp();
+
+  // Initialize Firebase Crashlytics
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   // Set up the background message handler for FCM
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // ======================================================================
-  // 4. INITIALIZE FLUTTER LOCAL NOTIFICATIONS PLUGIN
-  // This configures how local notifications behave on different platforms.
+  // 5. INITIALIZE FLUTTER LOCAL NOTIFICATIONS PLUGIN
   // ======================================================================
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings(
-          '@mipmap/ic_launcher'); // Use your app's icon
+      AndroidInitializationSettings('@mipmap/ic_launcher');
 
   final DarwinInitializationSettings initializationSettingsDarwin =
       DarwinInitializationSettings(
     onDidReceiveLocalNotification: (id, title, body, payload) async {
-      // Logic for handling iOS local notifications when app is in foreground
-      // (This is for older iOS versions, on newer ones onDidReceiveNotificationResponse is used)
       print('iOS Local Notification (Foreground): $title, $body, $payload');
-      // You might want to handle navigation here for older iOS versions
-      // if the payload contains navigation data.
     },
   );
 
@@ -83,28 +228,19 @@ void main() async {
     iOS: initializationSettingsDarwin,
   );
 
-  // Initialize the plugin with the settings
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) async {
-      // This callback is triggered when a notification (local or from FCM handled locally)
-      // is tapped by the user, regardless of app state (foreground, background, terminated).
       print('Notification Response Payload: ${response.payload}');
       if (response.payload != null && response.payload!.isNotEmpty) {
-        // If the payload contains a questId, navigate to the active quest screen
-        // We use the static router instance from AppRouter for navigation.
         print('Navigating to quest with ID from payload: ${response.payload}');
-        // Assuming the payload is the questId, navigate to the active quest route
-        // and potentially pass the questId as a parameter if your ActiveQuestScreen
-        // is set up to receive it. For this example, we'll just navigate to the screen.
-        // A more robust implementation would pass the ID and the screen would load it.
         AppRouter.router.go(AppConstants.activeQuestRoute);
       }
     },
   );
 
   // ======================================================================
-  // 5. REQUEST NOTIFICATION PERMISSIONS (iOS & Android 13+)
+  // 6. REQUEST NOTIFICATION PERMISSIONS (iOS & Android 13+)
   // ======================================================================
   FirebaseMessaging messaging = FirebaseMessaging.instance;
   NotificationSettings settings = await messaging.requestPermission(
@@ -116,123 +252,125 @@ void main() async {
     provisional: false,
     sound: true,
   );
-
   print('User notification permission status: ${settings.authorizationStatus}');
 
   // ======================================================================
-  // 6. GET FCM TOKEN AND SEND TO YOUR BACKEND
-  // This token identifies the specific device for sending targeted notifications.
+  // 7. GET FCM TOKEN AND SEND TO YOUR BACKEND
   // ======================================================================
   String? fcmToken = await messaging.getToken();
   print("FCM Device Token: $fcmToken");
   // TODO: Send this `fcmToken` to your application's backend.
-  // Associate it with the currently logged-in user so that your backend
-  // can send specific quest notifications to that user's device.
-  // This typically involves an API call from your AuthProvider or a dedicated UserService.
 
   // ======================================================================
-  // 7. LISTEN FOR FCM MESSAGES WHEN APP IS IN FOREGROUND
+  // 8. LISTEN FOR FCM MESSAGES WHEN APP IS IN FOREGROUND
   // ======================================================================
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print('FCM Message Received in Foreground!');
     print('Message data: ${message.data}');
-
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
-
-    // If there's a notification part, display it as a local notification.
-    // This makes sure the user sees a visual alert even if the app is open.
     if (notification != null && android != null) {
       flutterLocalNotificationsPlugin.show(
-        notification.hashCode, // Unique ID for the notification
+        notification.hashCode,
         notification.title,
         notification.body,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            'quest_channel', // Android Channel ID (must be unique)
-            'Quest Notifications', // Android Channel Name (user visible)
+            'quest_channel',
+            'Quest Notifications',
             channelDescription: 'Notifications for new and active quests',
-            icon: android.smallIcon, // Icon shown in status bar
-            importance: Importance.high, // Make it a high-priority notification
+            icon: android.smallIcon,
+            importance: Importance.high,
             priority: Priority.high,
-            // You can add sound, vibrate patterns etc. here
           ),
         ),
-        // Pass data (like questId) as payload so it's available on tap
         payload: message.data['questId'],
       );
     }
-    // TODO: If the user is currently on the ActiveQuestScreen and this notification
-    // is about a new quest, you might want to trigger a state update in the
-    // QuestProvider to load the new quest immediately without requiring a tap.
-    // This would involve accessing the QuestProvider instance here.
-    // This is where Riverpod's `container` could be used if you need to access providers
-    // from a non-widget context, but typically this logic goes into a service or provider.
   });
 
   // ======================================================================
-  // 8. LISTEN FOR FCM MESSAGES WHEN APP IS OPENED FROM NOTIFICATION TAP
-  // This listener is called when a user taps on a notification that brought
-  // the app from background/terminated state to foreground.
+  // 9. LISTEN FOR FCM MESSAGES WHEN APP IS OPENED FROM NOTIFICATION TAP
   // ======================================================================
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     print('FCM Message opened app from background/terminated state!');
     print('Notification Data: ${message.data}');
-    // This is the primary place to navigate the user to the relevant screen,
-    // e.g., the ActiveQuestScreen, using `message.data` to get the quest ID.
     if (message.data['questId'] != null) {
       print(
           'Navigating to quest with ID from opened app: ${message.data['questId']}');
-      // Navigate to the active quest route.
-      // If your ActiveQuestScreen expects a questId parameter in the route,
-      // you would pass it here, e.g., AppRouter.router.go('${AppConstants.activeQuestRoute}/${message.data['questId']}');
       AppRouter.router.go(AppConstants.activeQuestRoute);
     }
   });
 
   // ======================================================================
-  // 9. RIVERPOD PROVIDER SCOPE AND APP RUN
+  // 10. INITIALIZE AND START FLUTTER BACKGROUND SERVICE
+  // ======================================================================
+  final service = FlutterBackgroundService();
+
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart:
+          onStart, // The top-level function that runs in the background Isolate
+      autoStart:
+          false, // Set to false initially, start manually when needed (e.g., after login)
+      isForegroundMode:
+          true, // Essential for continuous tasks like location tracking
+      notificationChannelId:
+          'background_service_channel', // Android 8.0+ required
+      notificationTitle: 'Campus Pulse Service',
+      notificationContent: 'Running in background',
+      initialNotificationTitle: 'Campus Pulse Service',
+      initialNotificationContent: 'Initializing...',
+      foregroundServiceNotificationId:
+          888, // Unique ID for the foreground notification
+    ),
+    iosConfiguration: IosConfiguration(
+      onStart:
+          onStart, // The top-level function that runs in the background Isolate
+      autoStart: false, // Set to false initially
+      onForeground:
+          onStart, // For iOS, onStart is called for both foreground and background
+      onBackground:
+          onStart, // For iOS, onStart is called for both foreground and background
+      autoStartEvent: 'autoStart', // Custom event to trigger auto-start on iOS
+    ),
+  );
+
+  // You can start the service here if it should always run (e.g., for leaderboard updates)
+  // Or start it conditionally (e.g., when a user logs in, or a specific quest type starts)
+  // await service.start(); // This would start it immediately on app launch.
+  // For now, we'll keep it commented out, assuming you'll start it conditionally.
+
+  // ======================================================================
+  // 11. RIVERPOD PROVIDER SCOPE AND APP RUN
   // ======================================================================
   runApp(
     const ProviderScope(
-      // Replaced MultiProvider with ProviderScope
-      child: MyApp(), // Your root widget
+      child: MyApp(),
     ),
   );
 }
 
 // ========================================================================
-// 10. MYAPP WIDGET - Root of your UI (Now a ConsumerWidget to watch theme)
+// 12. MYAPP WIDGET - Root of your UI
 // ========================================================================
 class MyApp extends ConsumerWidget {
-  // Changed to ConsumerWidget
-  // It's good practice to make the router accessible, perhaps via a static instance
-  // or by passing it down if dynamic navigation is needed from outside widgets.
-  // For GoRouter, often AppRouter itself is designed to be accessible.
-  // Making it static here to allow access from FCM listeners in main.dart
-  static final GoRouter router = AppRouter().router; // Made router static
+  static final GoRouter router = AppRouter().router;
 
-  const MyApp({super.key}); // Added const constructor
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Added WidgetRef
-    // Watch the themeMode from the Riverpod themeProvider
     final themeMode = ref.watch(themeModeProvider);
-
-    // Initialize AuthProvider's initial status check once the app starts
-    // This is a good place to do it, as it's part of the app's initial setup.
-    // Use ref.read to call the notifier method, as we don't need to rebuild MyApp
-    // when the AuthProvider state changes.
     ref.read(authProvider.notifier).checkInitialAuthStatus();
 
     return MaterialApp.router(
-      routerConfig: MyApp.router, // Use the static router
+      routerConfig: MyApp.router,
       title: AppConstants.appName,
-      theme: AppTheme.lightTheme, // Use the light theme
-      darkTheme: AppTheme.darkTheme, // Use the dark theme
-      themeMode: themeMode, // Set theme mode based on Riverpod ThemeProvider
-      debugShowCheckedModeBanner: false, // Hide debug banner
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      debugShowCheckedModeBanner: false,
     );
   }
 }

@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
-import 'package:go_router/go_router.dart'; // For navigation
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../domain/entities/user.dart';
-import '../../providers/auth_provider.dart'; // Import Riverpod auth provider
+import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../widgets/common/themed_button.dart';
 import '../../widgets/common/loading_indicator.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
-  // Changed to ConsumerStatefulWidget
   static const routeName = '/signup';
 
   const SignUpScreen({super.key});
 
   @override
-  ConsumerState<SignUpScreen> createState() =>
-      _SignUpScreenState(); // Changed state type
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
-  // Changed state type
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -38,7 +35,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     if (_formKey.currentState!.validate()) {
       FocusScope.of(context).unfocus();
 
-      // Access the AuthNotifier to call methods
       final authNotifier = ref.read(authProvider.notifier);
       await authNotifier.signUp(
         email: _emailController.text.trim(),
@@ -47,19 +43,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         role: _selectedRole,
       );
 
-      // Read the current auth state after the signup attempt
       final authState = ref.read(authProvider);
 
       if (authState.user != null) {
         print('User signed up successfully: ${authState.user!.username}');
         if (authNotifier.requiresFacultySelection()) {
-          // Use notifier's helper method
           print('Navigating to Faculty Selection Screen...');
-          GoRouter.of(context).pushReplacement(
-              AppConstants.facultySelectionRoute); // Use GoRouter
-        } else {
           GoRouter.of(context)
-              .pushReplacement(AppConstants.homeRoute); // Use GoRouter
+              .pushReplacement(AppConstants.facultySelectionRoute);
+        } else {
+          GoRouter.of(context).pushReplacement(AppConstants.homeRoute);
         }
       } else if (authState.errorMessage != null &&
           authState.errorMessage!.isNotEmpty) {
@@ -74,13 +67,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the loading state from the authProvider
     final isLoading =
         ref.watch(authProvider.select((state) => state.isLoading));
-    final errorMessage =
-        ref.watch(authProvider.select((state) => state.errorMessage));
+    // final errorMessage = ref.watch(authProvider.select((state) => state.errorMessage)); // Handled by listener
 
-    // Optional: Listen for error messages and show SnackBar immediately
     ref.listen<String?>(authErrorMessageProvider, (previous, next) {
       if (next != null && next.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -100,13 +90,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                   'Create Your Account',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold), // Use theme style
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
@@ -150,9 +138,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                const Text('Select Role:',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  'Select Role:',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold), // Use theme style
+                ),
                 Row(
                   children: [
                     Expanded(
@@ -186,7 +176,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // Use the isLoading provider directly
                 ThemedButton(
                   text: 'Sign Up',
                   onPressed: isLoading ? null : _signUp,
@@ -195,9 +184,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
-                    GoRouter.of(context).pushReplacement(
-                        AppConstants.loginRoute); // Use GoRouter
+                    GoRouter.of(context)
+                        .pushReplacement(AppConstants.loginRoute);
                   },
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(
+                        double.infinity, 48), // Ensure good tap target
+                  ),
                   child: const Text('Already have an account? Log in'),
                 ),
               ],

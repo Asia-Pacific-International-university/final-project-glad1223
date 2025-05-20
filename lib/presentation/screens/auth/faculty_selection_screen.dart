@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
-import 'package:go_router/go_router.dart'; // For navigation
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../providers/auth_provider.dart'; // Import Riverpod auth provider
+import '../../providers/auth_provider.dart';
 import '../../widgets/common/themed_button.dart';
+import 'package:final_project/core/constants/faculty_constants.dart'; // Import AppFaculties
 
 class FacultySelectionScreen extends ConsumerStatefulWidget {
-  // Changed to ConsumerStatefulWidget
   const FacultySelectionScreen({super.key});
 
   @override
   ConsumerState<FacultySelectionScreen> createState() =>
-      _FacultySelectionScreenState(); // Changed state type
+      _FacultySelectionScreenState();
 }
 
 class _FacultySelectionScreenState
     extends ConsumerState<FacultySelectionScreen> {
-  // Changed state type
   String? _selectedFacultyId;
   final List<MapEntry<String, String>> _facultyList = AppFaculties.facultyList;
 
@@ -29,16 +28,13 @@ class _FacultySelectionScreenState
   }
 
   void _checkRedirect() {
-    // Read the current auth state from the provider
     final authState = ref.read(authProvider);
     final authNotifier = ref.read(authProvider.notifier);
 
-    // If user is not logged in OR doesn't need faculty selection, redirect away
     if (authState.user == null || !authNotifier.requiresFacultySelection()) {
       print(
           'FacultySelectionScreen: Redirecting. User null: ${authState.user == null}, Needs selection: ${authNotifier.requiresFacultySelection()}');
-      GoRouter.of(context)
-          .go(AppConstants.homeRoute); // Use GoRouter for redirection
+      GoRouter.of(context).go(AppConstants.homeRoute);
     } else {
       print('FacultySelectionScreen: User needs faculty selection.');
     }
@@ -53,8 +49,7 @@ class _FacultySelectionScreenState
     }
 
     final authNotifier = ref.read(authProvider.notifier);
-    final currentUser =
-        ref.read(authProvider).user; // Read current user from state
+    final currentUser = ref.read(authProvider).user;
 
     if (currentUser == null || !authNotifier.requiresFacultySelection()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -62,7 +57,7 @@ class _FacultySelectionScreenState
             content:
                 Text('Error: User session invalid or faculty already set.')),
       );
-      GoRouter.of(context).go(AppConstants.loginRoute); // Use GoRouter
+      GoRouter.of(context).go(AppConstants.loginRoute);
       return;
     }
 
@@ -73,10 +68,9 @@ class _FacultySelectionScreenState
 
     if (success) {
       print('Faculty updated successfully!');
-      GoRouter.of(context).go(AppConstants.homeRoute); // Use GoRouter
+      GoRouter.of(context).go(AppConstants.homeRoute);
     } else {
-      final errorMessage =
-          ref.read(authProvider).errorMessage; // Read error message from state
+      final errorMessage = ref.read(authProvider).errorMessage;
       print('Faculty update failed: $errorMessage');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage ?? 'Failed to update faculty')),
@@ -86,13 +80,11 @@ class _FacultySelectionScreenState
 
   @override
   Widget build(BuildContext context) {
-    // Watch the relevant parts of the AuthState
     final authState = ref.watch(authProvider);
     final isLoading = authState.isLoading;
     final requiresFacultySelection =
-        ref.watch(requiresFacultySelectionProvider); // Use helper provider
+        ref.watch(requiresFacultySelectionProvider);
 
-    // Show a loading/empty screen briefly while _checkRedirect runs
     if (authState.user == null || !requiresFacultySelection) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -107,10 +99,12 @@ class _FacultySelectionScreenState
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                   'Welcome! Please select your faculty to continue.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge, // Use theme style for better scaling
                 ),
                 const SizedBox(height: 24),
                 DropdownButtonFormField<String>(

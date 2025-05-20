@@ -1,30 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:final_project/domain/entities/quest.dart'
-    as q; // Alias to avoid conflict
+import 'package:final_project/domain/entities/quest.dart' as q;
+import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart';
+import 'package:final_project/core/error/failures.dart';
+import 'package:dartz/dartz.dart';
+import 'package:final_project/presentation/providers/quest_provider.dart';
+import 'package:final_project/domain/services/quest_submission_service.dart';
 
-// Assuming these are defined in your project:
-import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
-import 'package:final_project/core/error/failures.dart'; // Import Failure
-import 'package:dartz/dartz.dart'; // Import Either
-import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
-import 'package:final_project/domain/services/quest_submission_service.dart'; // Import SubmissionResult
+import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../providers/auth_provider.dart';
 
-import 'package:go_router/go_router.dart'; // For navigation
-import '../../../core/constants/app_constants.dart'; // For routes
-import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
-
-// Import the Riverpod provider for SubmitMiniPuzzleAnswerUseCase
 import '../../../core/di/providers.dart';
 
-// ========================================================================
-// MINI PUZZLE QUEST WIDGET (PLACEHOLDER)
-// Displays a mini-puzzle and handles submission.
-// ========================================================================
 class MiniPuzzleQuestWidget extends ConsumerStatefulWidget {
-  // Assuming q.Quest entity has properties for the puzzle:
-  // String? puzzleDescription;
-  // String? puzzleData; // e.g., JSON string describing the puzzle layout/rules
   final q.Quest quest;
 
   const MiniPuzzleQuestWidget({super.key, required this.quest});
@@ -49,36 +38,51 @@ class _MiniPuzzleQuestWidgetState extends ConsumerState<MiniPuzzleQuestWidget> {
     final submitMiniPuzzleUseCase =
         ref.read(submitMiniPuzzleAnswerUseCaseProvider);
 
-    final puzzleDescription =
-        widget.quest.question; // Using 'question' field for description
-    // final puzzleData = widget.quest.puzzleData; // Assuming a specific field for puzzle data
+    final puzzleDescription = widget.quest.question;
 
-    if (puzzleDescription == null /* || puzzleData == null */) {
-      return const Center(child: Text('Invalid mini-puzzle quest data.'));
+    if (puzzleDescription == null) {
+      return Center(
+        child: Text(
+          'Invalid mini-puzzle quest data.',
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.error),
+        ),
+      );
     }
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(8.0), // Add padding to the scroll view
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Mini-Puzzle:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold), // Use theme style
           ),
           const SizedBox(height: 8),
-          Text(puzzleDescription), // Display puzzle description/instructions
+          Text(
+            puzzleDescription,
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge, // Use bodyLarge for description
+          ),
           const SizedBox(height: 16),
-
           TextField(
             controller: _answerController,
             decoration: const InputDecoration(
               labelText: 'Your Answer',
               border: OutlineInputBorder(),
             ),
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge, // Ensure text in field scales
           ),
-
           const SizedBox(height: 16),
-
           Center(
             child: ElevatedButton(
               onPressed: _isSubmitting || _answerController.text.trim().isEmpty
@@ -87,6 +91,12 @@ class _MiniPuzzleQuestWidgetState extends ConsumerState<MiniPuzzleQuestWidget> {
                       _handleSubmit(context, ref, submitMiniPuzzleUseCase,
                           _answerController.text.trim());
                     },
+              style: ElevatedButton.styleFrom(
+                minimumSize:
+                    const Size(double.infinity, 50), // Ensure good tap target
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
               child: _isSubmitting
                   ? const SizedBox(
                       width: 20,
@@ -156,7 +166,7 @@ class _MiniPuzzleQuestWidgetState extends ConsumerState<MiniPuzzleQuestWidget> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Error: ${failure.message}'),
-        backgroundColor: Colors.red,
+        backgroundColor: Colors.red, // Ensure good contrast for error message
       ),
     );
   }
