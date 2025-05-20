@@ -204,20 +204,20 @@ class LeaderboardRepositoryImpl implements LeaderboardRepositories {
       print('Firestore error fetching accuracy leaderboard: ${e.message}');
       // If remote fails, try returning potentially stale cached data as a fallback
       final cachedFaculties = await _getFacultiesFromLocal();
-      if (cachedFaculties.isNotEmpty) {
-        print('Remote fetch failed, returning cached accuracy leaderboard as fallback.');
-        return Right(_mapModelsToEntries(cachedFaculties));
-      }
-      return Left(ServerFailure('Failed to fetch accuracy leaderboard: ${e.message}'));
-    } catch (e) {
-      print('Error fetching accuracy leaderboard: $e');
-      // If remote fails, try returning potentially stale cached data as a fallback
-      final cachedFaculties = await _getFacultiesFromLocal();
-      if (cachedFaculties.isNotEmpty) {
-        print('Remote fetch failed, returning cached accuracy leaderboard as fallback.');
-        return Right(_mapModelsToEntries(cachedFaculties));
-      }
-      return Left(ServerFailure('Failed to fetch accuracy leaderboard: ${e.toString()}'));
-    }
-  }
+    if (cachedFaculties.isNotEmpty) {
+      print('Remote fetch failed, returning cached accuracy leaderboard as fallback.');
+      return Right(_mapModelsToEntries(cachedFaculties));
+     }
+      return Left(ServerFailure('Failed to fetch accuracy leaderboard: ${e.message}'));
+  } catch (e) {
+  print('Error fetching accuracy leaderboard: $e');
+// If remote fails, try returning potentially stale cached data as a fallback
+final cachedFaculties = await _getFacultiesFromLocal();
+ if (cachedFaculties.isNotEmpty) {
+print('Remote fetch failed, returning cached accuracy leaderboard as fallback.');
+ return Right(_mapModelsToEntries(cachedFaculties));
+}
+return Left(ServerFailure('Failed to fetch accuracy leaderboard: ${e.toString()}'));
+}
+}
 }

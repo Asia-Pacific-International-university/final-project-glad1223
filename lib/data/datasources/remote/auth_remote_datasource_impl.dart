@@ -4,26 +4,22 @@ import 'package:firebase_auth/firebase_auth.dart'
     as firebase_auth; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import '../../../core/constants/app_constants.dart';
-import '../../../core/error/exceptions.dart';
+import '../../../core/error/exceptions.dart'; // Assuming this defines ServerException, AuthenticationException etc.
 import '../../models/user_model.dart';
 import 'auth_remote_datasource.dart';
-// import 'api_client.dart'; // ApiClient is no longer directly used here, removed if not needed elsewhere
 import 'dart:async';
 
+/// Implementation of [AuthRemoteDataSource] that interacts with Firebase Authentication and Firestore.
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  // final ApiClient? apiClient; // Removed if not used
-  final firebase_auth.FirebaseAuth _firebaseAuth; // Now a dependency
-  final FirebaseFirestore _firestore; // Now a dependency
+  final firebase_auth.FirebaseAuth _firebaseAuth; // Firebase Auth instance
+  final FirebaseFirestore _firestore; // Firestore instance
 
+  /// Constructs an [AuthRemoteDataSourceImpl] with required Firebase dependencies.
   AuthRemoteDataSourceImpl({
     required firebase_auth.FirebaseAuth firebaseAuth,
     required FirebaseFirestore firestore,
-    // this.apiClient // Removed if not used
   })  : _firebaseAuth = firebaseAuth,
         _firestore = firestore;
-  // {
-  //   print("AuthRemoteDataSourceImpl initialized with API Client: ${apiClient != null}");
-  // }
 
   @override
   Future<UserModel> signUpWithEmailAndPassword({
@@ -71,7 +67,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         totalPoints: 0,
         badges: [],
       );
-      print("User signed up successfully.  Returning $newUser");
+      print("User signed up successfully. Returning $newUser");
       return newUser;
     } on firebase_auth.FirebaseAuthException catch (e) {
       // Handle Firebase Auth specific errors
@@ -79,7 +75,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       // Handle other errors (e.g., Firestore errors)
       print("Error during sign up: $e");
-      throw ServerException('Failed to sign up: $e');
+      throw ServerException('Failed to sign up: ${e.toString()}');
     }
   }
 
@@ -90,7 +86,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }) async {
     print("signInWithEmailAndPassword called for $email");
     try {
-      // 1. Sign in with Firebase Authentication
+      // Attempt standard Firebase sign-in
       final firebaseUserCredential =
           await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
@@ -102,45 +98,124 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw AuthenticationException('Failed to sign in.');
       }
 
-      // 2. Retrieve user data from Firestore
+      // Retrieve user data from Firestore
       final userDoc =
           await _firestore.collection('users').doc(firebaseUser.uid).get();
 
       if (!userDoc.exists) {
-        throw AuthenticationException(
-            'User data not found in Firestore.  This should not happen.');
+        // This case should ideally not happen if user signed in successfully via Firebase Auth
+        // and was properly signed up. However, as a fallback for exemplary users,
+        // we can try to create their Firestore document if it's missing.
+        final exemplaryUser = ExemplaryUsers.findByEmail(email);
+        if (exemplaryUser != null && exemplaryUser.password == password) {
+          print(
+              "Exemplary user ${email} signed in via Firebase Auth, but Firestore doc missing. Creating it now.");
+          await _firestore.collection('users').doc(firebaseUser.uid).set({
+            'username': exemplaryUser.username,
+            'email': exemplaryUser.email,
+            'role': exemplaryUser.role.name,
+            'facultyId': exemplaryUser.facultyId,
+            'totalPoints': 0,
+            'badges': [],
+          });
+          // Re-fetch the document to ensure it's fresh
+          final updatedUserDoc =
+              await _firestore.collection('users').doc(firebaseUser.uid).get();
+          return _userModelFromFirestoreDoc(firebaseUser, updatedUserDoc);
+        } else {
+          throw AuthenticationException(
+              'User data not found in Firestore. This should not happen.');
+        }
       }
 
-      final userData = userDoc.data();
-      if (userData == null) {
-        throw AuthenticationException("User Data was null");
-      }
-
-      // 3. Convert role string back to UserRole enum.
-      UserRole userRole;
-      try {
-        userRole = UserRole.values.firstWhere(
-            (e) => e.name == userData['role']); //userData!['role']);
-      } catch (e) {
-        print("Error parsing role: ${userData['role']}.  Defaulting to User");
-        userRole = UserRole.user; // Default role if the stored role is invalid
-      }
-      // 4. Create and return the UserModel
-      return UserModel(
-        id: firebaseUser.uid,
-        email: firebaseUser.email!,
-        username: userData['username'] ?? '', // Provide a default value if null
-        role: userRole,
-        facultyId: userData['facultyId'],
-        totalPoints: userData['totalPoints'],
-        badges: List<String>.from(userData['badges'] ?? []),
-      );
+      return _userModelFromFirestoreDoc(firebaseUser, userDoc);
     } on firebase_auth.FirebaseAuthException catch (e) {
+      // Handle Firebase Auth specific errors
+      // If user-not-found or wrong-password for an exemplary user, attempt to sign them up.
+      final exemplaryUser = ExemplaryUsers.findByEmail(email);
+      if (exemplaryUser != null && exemplaryUser.password == password) {
+        if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+          print(
+              "Attempting to auto-create exemplary user ${email} as they were not found or password was wrong.");
+          try {
+            // Auto-create the user in Firebase Auth
+            final newFirebaseUserCredential =
+                await _firebaseAuth.createUserWithEmailAndPassword(
+              email: exemplaryUser.email,
+              password: exemplaryUser.password,
+            );
+            final newFirebaseUser = newFirebaseUserCredential.user;
+
+            if (newFirebaseUser == null) {
+              throw AuthenticationException(
+                  'Failed to auto-create exemplary user.');
+            }
+
+            // Create their Firestore document
+            await _firestore.collection('users').doc(newFirebaseUser.uid).set({
+              'username': exemplaryUser.username,
+              'email': exemplaryUser.email,
+              'role': exemplaryUser.role.name,
+              'facultyId': exemplaryUser.facultyId,
+              'totalPoints': 0,
+              'badges': [],
+            });
+
+            // Return the newly created user model
+            return UserModel(
+              id: newFirebaseUser.uid,
+              email: newFirebaseUser.email!,
+              username: exemplaryUser.username,
+              role: exemplaryUser.role,
+              facultyId: exemplaryUser.facultyId,
+              totalPoints: 0,
+              badges: [],
+            );
+          } on firebase_auth.FirebaseAuthException catch (createError) {
+            // If auto-creation fails (e.g., email-already-in-use by another user),
+            // re-throw the original sign-in error.
+            print(
+                "Auto-creation failed for exemplary user: ${createError.code}");
+            throw _handleFirebaseError(e); // Re-throw original sign-in error
+          }
+        }
+      }
+      // For non-exemplary users or other Firebase errors, re-throw the original error
       throw _handleFirebaseError(e);
     } catch (e) {
+      // Handle other errors (e.g., network issues, data parsing)
       print("Error during sign in: $e");
-      throw AuthenticationException('Failed to sign in: $e');
+      throw AuthenticationException('Failed to sign in: ${e.toString()}');
     }
+  }
+
+  /// Helper method to convert Firebase User and Firestore DocumentSnapshot to UserModel.
+  UserModel _userModelFromFirestoreDoc(
+      firebase_auth.User firebaseUser, DocumentSnapshot userDoc) {
+    if (!userDoc.exists || userDoc.data() == null) {
+      throw AuthenticationException(
+          'User data not found or is null in Firestore.');
+    }
+    final userData = userDoc.data() as Map<String, dynamic>;
+
+    UserRole userRole;
+    try {
+      userRole = UserRole.values.firstWhere((e) =>
+          e.name == userData['role']); // Convert role string back to enum
+    } catch (e) {
+      print("Error parsing role: ${userData['role']}. Defaulting to User");
+      userRole = UserRole.user; // Default role if the stored role is invalid
+    }
+
+    return UserModel(
+      id: firebaseUser.uid,
+      email: firebaseUser.email!,
+      username: userData['username'] ?? '', // Provide a default value if null
+      role: userRole,
+      facultyId: userData['facultyId'],
+      totalPoints: userData['totalPoints'],
+      badges: List<String>.from(userData['badges'] ?? []),
+    );
   }
 
   @override
@@ -150,7 +225,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await _firebaseAuth.signOut();
     } catch (e) {
       print("Error during sign out: $e");
-      throw ServerException('Failed to sign out: $e');
+      throw ServerException('Failed to sign out: ${e.toString()}');
     }
   }
 
@@ -166,30 +241,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           await _firestore.collection('users').doc(firebaseUser.uid).get();
 
       if (!userDoc.exists) {
+        // This could happen if a user was deleted from Firestore but still logged in via Firebase Auth.
+        // Or if it's an exemplary user whose Firestore doc was never created.
+        final exemplaryUser = ExemplaryUsers.findByEmail(firebaseUser.email!);
+        if (exemplaryUser != null) {
+          print(
+              "Exemplary user ${firebaseUser.email} found in Firebase Auth, but Firestore doc missing. Creating it now.");
+          await _firestore.collection('users').doc(firebaseUser.uid).set({
+            'username': exemplaryUser.username,
+            'email': exemplaryUser.email,
+            'role': exemplaryUser.role.name,
+            'facultyId': exemplaryUser.facultyId,
+            'totalPoints': 0,
+            'badges': [],
+          });
+          // Re-fetch the document to ensure it's fresh
+          final updatedUserDoc =
+              await _firestore.collection('users').doc(firebaseUser.uid).get();
+          return _userModelFromFirestoreDoc(firebaseUser, updatedUserDoc);
+        }
         return null; // Or throw an exception if user should always exist
       }
-      final userData = userDoc.data();
-      if (userData == null) {
-        return null;
-      }
-      UserRole userRole;
-      try {
-        userRole =
-            UserRole.values.firstWhere((e) => e.name == userData['role']);
-      } catch (e) {
-        print("Error getting user role, defaulting to user.");
-        userRole = UserRole.user;
-      }
-
-      return UserModel(
-        id: firebaseUser.uid,
-        email: firebaseUser.email!,
-        username: userData['username'] ?? '',
-        role: userRole,
-        facultyId: userData['facultyId'],
-        totalPoints: userData['totalPoints'],
-        badges: List<String>.from(userData['badges'] ?? []),
-      );
+      return _userModelFromFirestoreDoc(firebaseUser, userDoc);
     } catch (e) {
       print("Error fetching current user: $e");
       return null; // Or handle the error as needed.
@@ -210,37 +283,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // 2. Retrieve the updated user data from Firestore
       final userDoc = await _firestore.collection('users').doc(userId).get();
-      if (!userDoc.exists) {
-        throw UserNotFoundException(
-            'User with ID $userId not found in Firestore.');
-      }
-      final userData = userDoc.data();
-      if (userData == null) {
-        throw ServerException("User Data was null");
+      final firebaseUser = _firebaseAuth.currentUser;
+
+      if (firebaseUser == null || firebaseUser.uid != userId) {
+        throw AuthenticationException(
+            'Current Firebase user mismatch or not logged in.');
       }
 
-      // 3. Convert role string to UserRole
-      UserRole userRole;
-      try {
-        userRole =
-            UserRole.values.firstWhere((e) => e.name == userData['role']);
-      } catch (e) {
-        print("Error getting user role, defaulting to user.");
-        userRole = UserRole.user;
-      }
-      // 4. Return the updated UserModel
-      return UserModel(
-        id: userId,
-        email: userData['email'],
-        username: userData['username'],
-        role: userRole,
-        facultyId: facultyId, // The updated facultyId
-        totalPoints: userData['totalPoints'],
-        badges: List<String>.from(userData['badges'] ?? []),
-      );
+      return _userModelFromFirestoreDoc(firebaseUser, userDoc);
     } catch (e) {
       print("Error updating user faculty: $e");
-      throw ServerException('Failed to update faculty: $e');
+      throw ServerException('Failed to update faculty: ${e.toString()}');
     }
   }
 
