@@ -6,16 +6,17 @@ import 'package:final_project/domain/entities/quest.dart'
 // Assuming these are defined in your project:
 import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
 import 'package:final_project/core/error/failures.dart'; // Import Failure
-import 'package:dartz/dartz.dart'; // Import Either
-import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
-import 'package:final_project/domain/services/quest_submission_service.dart'; // Import SubmissionResult
+// import 'package:dartz/dartz.dart'; // Import Either
+// import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
+// import 'package:final_project/domain/services/quest_submision_service.dart'; // Import SubmissionResult
 
 import 'package:go_router/go_router.dart'; // For navigation
 import '../../../core/constants/app_constants.dart'; // For routes
 import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
 
 // Import the Riverpod provider for SubmitPollVoteUseCase
-import '../../../core/di/providers.dart';
+import '../../../core/riverpodDI/providers.dart';
+//import 'package:final_project/domain/usecases/submit_poll_vote_usecase.dart';
 
 // ========================================================================
 // POLL QUEST WIDGET (PLACEHOLDER)

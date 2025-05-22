@@ -2,27 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:dartz/dartz.dart';
+//import 'package:dartz/dartz.dart';
 import 'package:final_project/domain/entities/quest.dart'
     as q; // Import the domain Quest
 
 // Assuming these are defined in your project:
 import 'package:final_project/core/error/failures.dart'; // Import Failure
 import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
-import 'package:final_project/domain/services/quest_submission_service.dart'; // Import SubmissionResult
-import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
+// import 'package:final_project/domain/services/quest_submision_service.dart'; // Import SubmissionResult
+// import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
 
 import 'package:go_router/go_router.dart'; // For navigation
 import '../../../core/constants/app_constants.dart'; // For routes
-import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
+//import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
+import 'package:final_project/core/services/camera_service.dart'; // Assuming CameraService and its provider are defined elsewhere
+//import 'package:final_project/domain/usecases/submit_photo_answer_usecase.dart'; // Assuming SubmitPhotoAnswerUseCase and its provider are defined elsewhere
 
-// Assuming CameraService and its provider are defined elsewhere
-// import 'package:final_project/core/services/camera_service.dart';
-// final cameraServiceProvider = Provider<CameraService>((ref) => CameraService());
 
-// Assuming SubmitPhotoAnswerUseCase and its provider are defined elsewhere
-// import 'package:final_project/domain/usecases/submit_photo_answer_usecase.dart';
-// final submitPhotoAnswerUseCaseProvider = Provider<SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams>>(...);
+
+final cameraServiceProvider = Provider<CameraService>((ref) => CameraService());
+final submitPhotoAnswerUseCaseProvider = Provider<SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams>>(...);
 
 // ========================================================================
 // PHOTO CHALLENGE QUEST WIDGET

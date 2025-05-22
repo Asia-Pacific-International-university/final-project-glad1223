@@ -29,7 +29,7 @@ class SubmitTriviaAnswerUseCase
       : _submissionService = submissionService;
 
   @override
-  Future<Either<Failure, QuestSubmissionResult>> call(
+  Future<Either<Failure, SubmissionResult>> call(
       SubmitTriviaAnswerParams params) async {
     // Call the submission service to process the trivia answer
     return await _submissionService.processTriviaSubmission(

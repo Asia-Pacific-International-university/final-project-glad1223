@@ -5,11 +5,12 @@ import 'package:final_project/domain/entities/quest.dart'
 
 // Assuming these are defined in your project:
 import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
-import 'package:final_project/core/error/failures.dart'; // Import Failure
-import 'package:dartz/dartz.dart'; // FIX: Uncommented to import Either
+import 'package:final_project/domain/usecases/submit_trivia_answer_usecase.dart';
+//import 'package:final_project/core/error/failures.dart'; // Import Failure
+//import 'package:dartz/dartz.dart'; // FIX: Uncommented to import Either
 import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
 import 'package:final_project/presentation/providers/auth_provider.dart'; // FIX: Uncommented to use authProvider
-
+//import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart';
 import 'package:go_router/go_router.dart'; // For navigation
 import '../../../core/constants/app_constants.dart'; // For routes
 

@@ -29,7 +29,7 @@ class SubmitPhotoAnswerUseCase
       : _submissionService = submissionService;
 
   @override
-  Future<Either<Failure, QuestSubmissionResult>> call(
+  Future<Either<Failure, SubmissionResult>> call(
       SubmitPhotoAnswerParams params) async {
     // Call the submission service to process the photo challenge
     return await _submissionService.processPhotoChallengeSubmission(

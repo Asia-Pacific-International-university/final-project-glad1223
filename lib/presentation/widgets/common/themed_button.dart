@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
 import 'package:final_project/core/theme/theme_provider.dart'; // Import Riverpod theme provider
 import 'package:final_project/core/theme/app_theme.dart'; // Your AppTheme
+import 'package:final_project/core/riverpodDI/providers.dart';
 
 class ThemedButton extends ConsumerWidget {
   // Changed to ConsumerWidget

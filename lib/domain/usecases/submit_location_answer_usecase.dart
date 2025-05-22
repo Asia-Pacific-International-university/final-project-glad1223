@@ -32,7 +32,7 @@ class SubmitLocationAnswerUseCase
       : _submissionService = submissionService;
 
   @override
-  Future<Either<Failure, QuestSubmissionResult>> call(
+  Future<Either<Failure, SubmissionResult>> call(
       SubmitLocationAnswerParams params) async {
     // Call the submission service to process the location check-in
     return await _submissionService.processLocationCheckInSubmission(

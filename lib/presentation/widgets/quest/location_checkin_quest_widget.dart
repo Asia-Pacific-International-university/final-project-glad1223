@@ -6,22 +6,16 @@ import 'package:final_project/domain/entities/quest.dart'
     as q; // Import the domain Quest
 
 // Assuming these are defined in your project:
-import 'package:final_project/core/error/failures.dart'; // Import Failure
-import 'package:final_project/domain/usecases/submit_quest_answer_usecase.dart'; // Import Use Case and Params
-import 'package:final_project/domain/services/quest_submission_service.dart'; // Import SubmissionResult
+import 'package:final_project/core/error/failures.dart'; // Import Failure and its concrete types
 import 'package:final_project/presentation/providers/quest_provider.dart'; // Import providers
+//import 'package:final_project/domain/usecases/submit_location_answer_usecase.dart'; // Import Use Case and Params
+import 'package:final_project/domain/services/quest_submision_service.dart'; // Import SubmissionResult
+// import 'package:final_project/presentation/providers/quest_provider.dart'; // Duplicate import, remove if not needed
 
 import 'package:go_router/go_router.dart'; // For navigation
 import '../../../core/constants/app_constants.dart'; // For routes
 import '../../providers/auth_provider.dart'; // Assuming AuthProvider for user ID
-
-// Assuming LocationService and its provider are defined elsewhere
-// import 'package:final_project/core/services/location_service.dart';
-// final locationServiceProvider = Provider<LocationService>((ref) => LocationService());
-
-// Assuming SubmitLocationAnswerUseCase and its provider are defined elsewhere
-// import 'package:final_project/domain/usecases/submit_location_answer_usecase.dart';
-// final submitLocationAnswerUseCaseProvider = Provider<SubmitQuestAnswerUseCase<SubmitLocationAnswerParams>>(...);
+import '../../../core/riverpodDI/providers.dart'; // To access locationServiceProvider (like locationServiceProvider)
 
 // ========================================================================
 // LOCATION CHECK-IN QUEST WIDGET
@@ -61,20 +55,28 @@ class _LocationCheckInQuestWidgetState
       });
     } catch (e) {
       String errorMessage = 'Error getting location: $e';
+      // Default to UnexpectedFailure if no specific match
+      Failure specificFailure = UnexpectedFailure(message: errorMessage);
+
       if (e is LocationServiceDisabledException) {
-        errorMessage = 'Location services are disabled.';
+        errorMessage = 'Location services are disabled. Please enable them.';
+        specificFailure = const LocationServiceDisabledFailure();
       } else if (e is PermissionDeniedException) {
-        errorMessage = 'Location permission denied.';
+        errorMessage = 'Location permission denied. Please grant permission.';
+        specificFailure = const LocationPermissionDeniedFailure();
       } else if (e is Failure) {
-        // Handle custom LocationFailure
-        errorMessage = 'Location Error: ${e.message}';
+        // If the caught exception is already a Failure (e.g., from your LocationService), use it directly.
+        specificFailure = e;
+        errorMessage =
+            'Location Error: ${e.message}'; // Update errorMessage for display
       }
+      // No need for a final else as specificFailure is initialized to UnexpectedFailure
+
       setState(() {
         _locationStatus = errorMessage;
         _currentPosition = null; // Ensure position is null on error
       });
-      _showError(
-          context, Failure(message: errorMessage)); // Show error snackbar
+      _showError(context, specificFailure); // Show error snackbar
     } finally {
       setState(() {
         _isGettingLocation = false;
@@ -140,8 +142,11 @@ class _LocationCheckInQuestWidgetState
         submitLocationUseCase, // Use the specific type
   ) async {
     if (_currentPosition == null) {
+      // Use InvalidInputFailure as it represents a validation error on input
       _showError(
-          context, const Failure(message: 'Please get your location first.'));
+          context,
+          const InvalidInputFailure(
+              message: 'Please get your location first.'));
       return;
     }
 
@@ -150,13 +155,21 @@ class _LocationCheckInQuestWidgetState
     });
 
     // Get the actual logged-in user's ID from AuthProvider
-    final authProvider =
-        ref.read(authProvider); // Assuming authProvider is a Riverpod provider
-    final userId = authProvider.currentUser?.id;
+    // You need to ensure authProvider gives you an object that has 'currentUser' and 'currentUser.id'
+    // For example, if authProvider exposes a StateNotifier that holds AuthState:
+    // final authState = ref.read(authProvider);
+    // final userId = authState.user?.id; // Assuming AuthState has a 'user' entity with an 'id'
+
+    // If authProvider directly provides a User entity or a service that has a currentUser:
+    final authService = ref.read(authProvider); // Access the service/notifier
+    final userId = authService.currentUser?.id; // Access currentUser and its id
 
     if (userId == null) {
-      _showError(context,
-          const Failure(message: 'User not logged in. Cannot submit.'));
+      // Use AuthenticationFailure for user not logged in
+      _showError(
+          context,
+          const AuthenticationFailure(
+              message: 'User not logged in. Cannot submit.'));
       setState(() {
         _isSubmitting = false;
       });

@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
 import '../../core/error/failures.dart'; // Import your custom failure class
-import '../services/quest_submission_service.dart'; // Import the submission service
+import '../services/quest_submision_service.dart'; // Import the submission service
 
 // ========================================================================
 // ABSTRACT USE CASE FOR SUBMITTING QUEST ANSWERS
@@ -15,27 +15,30 @@ abstract class ParamFutureUseCase<Params, ReturnType> {
 // Abstract base class for all quest submission use cases
 abstract class SubmitQuestAnswerUseCase<Params>
     implements
-        ParamFutureUseCase<Params, Either<Failure, QuestSubmissionResult>> {
+        ParamFutureUseCase<Params, Either<Failure, SubmissionResult>> {
   // The call method takes parameters and returns an Either with Failure or QuestSubmissionResult
   @override
-  Future<Either<Failure, QuestSubmissionResult>> call(Params params);
+  Future<Either<Failure, SubmissionResult>> call(Params params);
 }
 
 // --- Specific Use Case Parameters (Examples) ---
 // These should be defined near their respective use case implementations or in a params file
 
 // Parameters for submitting a Trivia answer
-class SubmitTriviaAnswerParams {
+//class SubmitTriviaAnswerParams {
+class SubmitTriviaAnswer {
   final String questId;
   final String answer;
   final String userId; // Include userId
 
   SubmitTriviaAnswerParams(
+  SubmitTriviaAnswer(
       {required this.questId, required this.answer, required this.userId});
 }
 
 // Parameters for submitting a Poll vote
-class SubmitPollVoteParams {
+// class SubmitPollVoteParams {
+class SubmitPollVote {
   final String questId;
   final String selectedOptionId;
   final String userId; // Include userId
@@ -47,7 +50,8 @@ class SubmitPollVoteParams {
 }
 
 // Parameters for submitting Location Check-in
-class SubmitLocationAnswerParams {
+// class SubmitLocationAnswerParams {
+class SubmitLocationAnswer {
   final String questId;
   final double latitude;
   final double longitude;
