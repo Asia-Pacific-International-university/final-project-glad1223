@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:logger/logger.dart'; // Import the logger package
 import 'database_helper.dart'; // Import the database helper
 import '../../models/quest_model.dart'; // Import the QuestModel
 import 'quest_local_datasource.dart'; // Import the abstract data source
@@ -10,6 +11,17 @@ import 'dart:convert'; // For JSON encoding/decoding (for options)
 // ========================================================================
 class QuestLocalDataSourceImpl implements QuestLocalDataSource {
   final DatabaseHelper _databaseHelper;
+  // Initialize a logger instance for this class
+  final Logger _logger = Logger(
+    printer: PrettyPrinter(
+      methodCount: 0, // No method calls to be displayed
+      errorMethodCount: 5, // Number of method calls if stacktrace is provided
+      lineLength: 120, // Width of the output
+      colors: true, // Colorful log messages
+      printEmojis: true, // Print emojis
+      printTime: false, // Should each log print a timestamp
+    ),
+  );
 
   QuestLocalDataSourceImpl(this._databaseHelper);
 
@@ -64,7 +76,8 @@ class QuestLocalDataSourceImpl implements QuestLocalDataSource {
       return QuestType.values
           .firstWhere((e) => e.toString().split('.').last == typeString);
     } catch (e) {
-      print('Unknown quest type string: $typeString');
+      // Use logger.w for warnings (unknown type string)
+      _logger.w('Unknown quest type string: $typeString', e);
       return null; // Handle unknown types
     }
   }
@@ -72,7 +85,8 @@ class QuestLocalDataSourceImpl implements QuestLocalDataSource {
   @override
   Future<void> saveQuest(QuestModel quest) async {
     if (quest.id == null) {
-      print('Cannot save quest with null ID to SQLite');
+      // Use logger.e for errors (cannot save null ID)
+      _logger.e('Cannot save quest with null ID to SQLite');
       return; // Cannot save quest without an ID
     }
     final db = await _databaseHelper.database;
@@ -81,7 +95,8 @@ class QuestLocalDataSourceImpl implements QuestLocalDataSource {
       _questModelToMap(quest),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    print('QuestModel ${quest.id} saved/updated in SQLite');
+    // Use logger.i for informational messages
+    _logger.i('QuestModel ${quest.id} saved/updated in SQLite');
   }
 
   @override
@@ -94,10 +109,10 @@ class QuestLocalDataSourceImpl implements QuestLocalDataSource {
     );
 
     if (maps.isNotEmpty) {
-      print('QuestModel $questId retrieved from SQLite');
+      _logger.i('QuestModel $questId retrieved from SQLite');
       return _questModelFromMap(maps.first);
     } else {
-      print('QuestModel $questId not found in SQLite');
+      _logger.i('QuestModel $questId not found in SQLite');
       return null; // Quest not found
     }
   }
@@ -119,16 +134,14 @@ class QuestLocalDataSourceImpl implements QuestLocalDataSource {
     if (maps.isNotEmpty) {
       final quest = _questModelFromMap(maps.first);
       // Optional: Check if the cached quest is still "active" based on its timer
-      if (quest != null &&
-          quest.startTime != null &&
-          quest.timeLimitSeconds != null) {
+      if (quest.startTime != null && quest.timeLimitSeconds != null) {
         final expirationTime =
             quest.startTime!.add(Duration(seconds: quest.timeLimitSeconds!));
         if (DateTime.now().isBefore(expirationTime)) {
-          print('Active QuestModel retrieved from SQLite cache');
+          _logger.i('Active QuestModel retrieved from SQLite cache');
           return quest;
         } else {
-          print('Cached active QuestModel has expired.');
+          _logger.w('Cached active QuestModel has expired. Clearing it.');
           // Optionally clear expired active quest from cache
           if (quest.id != null) {
             clearQuest(quest.id!);
@@ -137,11 +150,12 @@ class QuestLocalDataSourceImpl implements QuestLocalDataSource {
         }
       } else {
         // If quest data is incomplete for timer check, return it anyway or null based on strategy
-        print('Active QuestModel retrieved from SQLite cache (no timer info)');
+        _logger.i(
+            'Active QuestModel retrieved from SQLite cache (no timer info for expiration check)');
         return quest; // Or return null if timer info is mandatory for active
       }
     } else {
-      print('No active QuestModel found in SQLite cache');
+      _logger.i('No active QuestModel found in SQLite cache');
       return null;
     }
   }
@@ -154,13 +168,13 @@ class QuestLocalDataSourceImpl implements QuestLocalDataSource {
       where: 'id = ?',
       whereArgs: [questId],
     );
-    print('QuestModel $questId cleared from SQLite');
+    _logger.i('QuestModel $questId cleared from SQLite');
   }
 
   @override
   Future<void> clearAllQuests() async {
     final db = await _databaseHelper.database;
     await db.delete(DatabaseHelper.questTable);
-    print('All QuestModels cleared from SQLite');
+    _logger.i('All QuestModels cleared from SQLite');
   }
 }

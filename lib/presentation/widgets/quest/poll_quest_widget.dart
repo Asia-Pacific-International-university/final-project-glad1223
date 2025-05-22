@@ -82,7 +82,7 @@ class _PollQuestWidgetState extends ConsumerState<PollQuestWidget> {
                   ? null
                   : () {
                       _handleSubmit(context, ref, submitPollVoteUseCase,
-                          _selectedOption!);
+                          _selectedOption!); // Null-assert _selectedOption here as it's checked above
                     },
               child: _isSubmitting
                   ? const SizedBox(
@@ -109,7 +109,8 @@ class _PollQuestWidgetState extends ConsumerState<PollQuestWidget> {
       _isSubmitting = true;
     });
 
-    final userId = ref.read(authProvider).user?.id;
+    // Access the user ID from the AuthState provided by authProvider
+    final userId = ref.read(authProvider).currentUser?.id;
 
     if (userId == null) {
       _showError(context,
@@ -136,7 +137,7 @@ class _PollQuestWidgetState extends ConsumerState<PollQuestWidget> {
       (submissionResult) {
         _showSuccess(context);
         GoRouter.of(context).go(AppConstants.questResultRoute, extra: {
-          'isSuccessful': submissionResult.isSuccessful,
+          'isSuccessful': submissionResult!.isSuccessful, // Null assertion
           'pointsEarned': submissionResult.pointsEarned,
           'feedbackMessage': submissionResult.feedbackMessage,
           'newBadges': submissionResult.newBadges,

@@ -1,13 +1,13 @@
 import 'package:dartz/dartz.dart';
+import 'package:logger/logger.dart'; // Import the logger package
 import '../../domain/entities/user.dart'; // Import your User entity
 import '../../domain/repositories/user_repositories.dart'; // Import the abstract repository
 import '../../core/error/failures.dart'; // Import your Failure classes
 import '../datasources/remote/auth_remote_datasource.dart'; // Using AuthRemoteDataSource for user data interaction
-// import '../datasources/remote/user_remote_datasource.dart'; // Alternative: if you create a dedicated UserRemoteDataSource
 import '../datasources/local/user_local_datasource.dart'; // Import the new UserLocalDataSource
-// import '../datasources/local/shared_preferences_service.dart'; // No longer needed for user data caching
 import '../models/user_model.dart'; // Import your UserModel
 import 'package:cloud_firestore/cloud_firestore.dart'; // Needed for temporary direct Firestore access
+// import 'package:final_project/core/services/notification_service.dart'; // This import seems unused here, consider removing it if it's not used.
 
 // ========================================================================
 // USER REPOSITORY IMPLEMENTATION
@@ -16,24 +16,33 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Needed for temporary d
 // Implements caching logic.
 // ========================================================================
 class UserRepositoryImpl implements UserRepository {
-  // Using AuthRemoteDataSource as it currently contains user data methods.
-  // If you create a separate UserRemoteDataSource, replace this dependency.
   final AuthRemoteDataSource _remoteDataSource;
-
-  // Dependency on the new SQLite UserLocalDataSource
   final UserLocalDataSource _localDataSource;
+  final Logger _logger; // Logger instance
 
   UserRepositoryImpl({
     required AuthRemoteDataSource remoteDataSource,
-    required UserLocalDataSource
-        localDataSource, // Now depends on UserLocalDataSource
+    required UserLocalDataSource localDataSource,
   })  : _remoteDataSource = remoteDataSource,
-        _localDataSource = localDataSource;
+        _localDataSource = localDataSource,
+        _logger = Logger(
+          // Initialize logger
+          printer: PrettyPrinter(
+            methodCount:
+                0, // No method calls to be displayed for repository logs
+            errorMethodCount:
+                5, // Number of method calls if stacktrace is provided
+            lineLength: 120, // Width of the output
+            colors: true, // Colorful log messages
+            printEmojis: true, // Print emojis
+            printTime: false, // Should each log print a timestamp
+          ),
+        );
 
   // --- Helper method to save user data to local cache (delegates to local data source) ---
   Future<void> _saveUserToLocal(UserModel user) async {
     await _localDataSource.saveUser(user);
-    print('UserModel ${user.id} saved/updated in SQLite cache');
+    _logger.i('UserModel ${user.id} saved/updated in SQLite cache');
   }
 
   // --- Helper method to get user data from local cache (delegates to local data source) ---
@@ -42,11 +51,14 @@ class UserRepositoryImpl implements UserRepository {
     return await _localDataSource.getUser(userId);
   }
 
-  // --- Helper method to clear local user cache (delegates to local data source) ---
+  // Removed _clearLocalUser as it was unreferenced and clearAllUsers is used instead.
+  // If you need specific user clearing, re-add this method and call it where appropriate.
+  /*
   Future<void> _clearLocalUser(String userId) async {
     await _localDataSource.clearUser(userId);
-    print('UserModel $userId cleared from SQLite cache');
+    _logger.i('UserModel $userId cleared from SQLite cache');
   }
+  */
 
   @override
   Future<Either<Failure, User?>> getCurrentUser() async {
@@ -58,9 +70,7 @@ class UserRepositoryImpl implements UserRepository {
 
       if (firebaseUser == null) {
         // No authenticated user, clear local cache and return null
-        print('No current user found remotely. Clearing local cache.');
-        // TODO: Clear the specific cached user if you know their ID, or clear all users if simpler
-        // await _clearLocalUser('some_id'); // Need a way to know which user was cached
+        _logger.i('No current user found remotely. Clearing local cache.');
         await _localDataSource
             .clearAllUsers(); // Simple approach: clear all cached users on logout/no user
         return const Right(null);
@@ -71,7 +81,7 @@ class UserRepositoryImpl implements UserRepository {
       // 2. Try to get the user's full profile from local cache first using the ID
       final cachedUser = await _getUserFromLocal(userId);
       if (cachedUser != null) {
-        print('Returning current user from local cache');
+        _logger.i('Returning current user from local cache');
         return Right(
             cachedUser.toDomain()); // Assuming UserModel has toDomain()
       }
@@ -84,22 +94,22 @@ class UserRepositoryImpl implements UserRepository {
           .get();
 
       if (!userDoc.exists) {
-        print('Current user profile $userId not found remotely');
+        _logger.w('Current user profile $userId not found remotely');
         // This is an unexpected scenario if Firebase Auth returned a user but Firestore doc is missing
         // You might want to log this error or handle it specifically.
         await _localDataSource
             .clearUser(userId); // Clear potentially incomplete local data
         return Left(
-            ServerFailure(message: 'User profile data missing in backend.'));
+            ServerFailure('User profile data missing in backend.')); // Fixed
       }
 
       final userData = userDoc.data();
       if (userData == null) {
-        print('Current user profile data for $userId is null remotely');
+        _logger.e('Current user profile data for $userId is null remotely');
         await _localDataSource
             .clearUser(userId); // Clear potentially incomplete local data
         return Left(
-            ServerFailure(message: 'User profile data is null in backend.'));
+            ServerFailure('User profile data is null in backend.')); // Fixed
       }
 
       // Convert Firestore data to UserModel
@@ -108,8 +118,8 @@ class UserRepositoryImpl implements UserRepository {
         userRole =
             UserRole.values.firstWhere((e) => e.name == userData['role']);
       } catch (e) {
-        print(
-            "Error getting current user role for $userId, defaulting to user.");
+        _logger.w(
+            "Error getting current user role for $userId, defaulting to user: $e");
         userRole = UserRole.user;
       }
 
@@ -126,24 +136,25 @@ class UserRepositoryImpl implements UserRepository {
 
       // 4. If fetched from remote, save to local cache
       await _saveUserToLocal(remoteUser);
-      print('Returning current user from remote source and cached locally');
+      _logger.i('Returning current user from remote source and cached locally');
       return Right(remoteUser.toDomain()); // Assuming UserModel has toDomain()
-    } catch (e) {
-      print('Error getting current user: $e');
+    } catch (e, stackTrace) {
+      _logger.e('Error getting current user: $e', e, stackTrace);
       // If remote fetch fails, you might still want to try returning cached data
       // if you didn't do it in step 2.
       // For robustness, if remote fails, try local one last time before returning failure.
-      final userIdFromAuth =
-          _remoteDataSource.getCurrentUser()?.id; // Try to get ID again
-      if (userIdFromAuth != null) {
-        final cachedUserOnError = await _getUserFromLocal(userIdFromAuth);
+      final firebaseUserOnAuthError =
+          await _remoteDataSource.getCurrentUser(); // Try to get ID again
+      if (firebaseUserOnAuthError != null) {
+        final cachedUserOnError =
+            await _getUserFromLocal(firebaseUserOnAuthError.id);
         if (cachedUserOnError != null) {
-          print('Remote fetch failed, returning cached user as fallback.');
+          _logger.w('Remote fetch failed, returning cached user as fallback.');
           return Right(cachedUserOnError.toDomain());
         }
       }
       return Left(ServerFailure(
-          message: 'Failed to get current user: ${e.toString()}'));
+          'Failed to get current user: ${e.toString()}')); // Fixed
     }
   }
 
@@ -153,7 +164,7 @@ class UserRepositoryImpl implements UserRepository {
       // 1. Try to get user from local cache first
       final cachedUser = await _getUserFromLocal(userId);
       if (cachedUser != null) {
-        print('Returning user profile $userId from local cache');
+        _logger.i('Returning user profile $userId from local cache');
         return Right(
             cachedUser.toDomain()); // Assuming UserModel has toDomain()
       }
@@ -166,13 +177,13 @@ class UserRepositoryImpl implements UserRepository {
           .get();
 
       if (!userDoc.exists) {
-        print('User profile $userId not found remotely');
+        _logger.w('User profile $userId not found remotely');
         return const Right(null); // User not found is a valid case
       }
 
       final userData = userDoc.data();
       if (userData == null) {
-        print('User profile data for $userId is null remotely');
+        _logger.e('User profile data for $userId is null remotely');
         return const Right(null);
       }
 
@@ -182,7 +193,8 @@ class UserRepositoryImpl implements UserRepository {
         userRole =
             UserRole.values.firstWhere((e) => e.name == userData['role']);
       } catch (e) {
-        print("Error getting user role for $userId, defaulting to user.");
+        _logger
+            .w("Error getting user role for $userId, defaulting to user: $e");
         userRole = UserRole.user;
       }
 
@@ -199,13 +211,13 @@ class UserRepositoryImpl implements UserRepository {
 
       // 3. If fetched from remote, save to local cache
       await _saveUserToLocal(remoteUser);
-      print(
+      _logger.i(
           'Returning user profile $userId from remote source and cached locally');
       return Right(remoteUser.toDomain()); // Assuming UserModel has toDomain()
-    } catch (e) {
-      print('Error getting user profile $userId: $e');
+    } catch (e, stackTrace) {
+      _logger.e('Error getting user profile $userId: $e', e, stackTrace);
       return Left(ServerFailure(
-          message: 'Failed to get user profile: ${e.toString()}'));
+          'Failed to get user profile: ${e.toString()}')); // Fixed
     }
   }
 
@@ -221,15 +233,15 @@ class UserRepositoryImpl implements UserRepository {
       // 2. Update the local cache with the new data
       await _saveUserToLocal(updatedUserModel);
 
-      print(
+      _logger.i(
           'User $userId faculty updated to $facultyId remotely and cached locally');
       return Right(
           updatedUserModel.toDomain()); // Return the updated User entity
-    } catch (e) {
-      print('Error updating user $userId faculty: $e');
+    } catch (e, stackTrace) {
+      _logger.e('Error updating user $userId faculty: $e', e, stackTrace);
       // Handle specific exceptions from AuthRemoteDataSource if needed
       return Left(ServerFailure(
-          message: 'Failed to update user faculty: ${e.toString()}'));
+          'Failed to update user faculty: ${e.toString()}')); // Fixed
     }
   }
 
@@ -246,7 +258,7 @@ class UserRepositoryImpl implements UserRepository {
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
         'totalPoints': newTotalPoints,
       });
-      print(
+      _logger.i(
           'Simulated updating points for user $userId to $newTotalPoints in Firestore');
 
       // After updating remotely, fetch the latest user data
@@ -263,16 +275,16 @@ class UserRepositoryImpl implements UserRepository {
         if (updatedUser == null) {
           // This case should ideally not happen if the update succeeded
           return Left(ServerFailure(
-              message: 'Failed to retrieve user after points update.'));
+              'Failed to retrieve user after points update.')); // Fixed
         }
-        print(
+        _logger.i(
             'User $userId points updated remotely and profile refetched/cached');
         return Right(updatedUser); // Return the updated User entity
       });
-    } catch (e) {
-      print('Error updating user $userId points: $e');
+    } catch (e, stackTrace) {
+      _logger.e('Error updating user $userId points: $e', e, stackTrace);
       return Left(ServerFailure(
-          message: 'Failed to update user points: ${e.toString()}'));
+          'Failed to update user points: ${e.toString()}')); // Fixed
     }
   }
 
@@ -292,7 +304,7 @@ class UserRepositoryImpl implements UserRepository {
         'badges': FieldValue.arrayUnion(
             badgesToAdd), // Use arrayUnion to add to the list
       });
-      print(
+      _logger.i(
           'Simulated adding badges $badgesToAdd for user $userId in Firestore');
 
       // After updating remotely, fetch the latest user data
@@ -307,38 +319,19 @@ class UserRepositoryImpl implements UserRepository {
         if (updatedUser == null) {
           // This case should ideally not happen if the update succeeded
           return Left(ServerFailure(
-              message: 'Failed to retrieve user after badge update.'));
+              'Failed to retrieve user after badge update.')); // Fixed
         }
-        print(
+        _logger.i(
             'User $userId badges updated remotely and profile refetched/cached');
         return Right(updatedUser); // Return the updated User entity
       });
-    } catch (e) {
-      print('Error adding badges $badgesToAdd to user $userId: $e');
+    } catch (e, stackTrace) {
+      _logger.e('Error adding badges $badgesToAdd to user $userId: $e', e,
+          stackTrace);
       return Left(
-          ServerFailure(message: 'Failed to add user badges: ${e.toString()}'));
+          ServerFailure('Failed to add user badges: ${e.toString()}')); // Fixed
     }
   }
 
   // TODO: Add other UserRepository method implementations here
 }
-
-// --- Assuming these helper/interface definitions exist in your project ---
-// Import these from your core/error and domain/entities directories
-
-// abstract class Failure { final String message; const Failure({required this message}); }
-// class ServerFailure extends Failure { const ServerFailure({String? message}) : super(message: message ?? 'Server Error'); }
-// class UserNotFoundException extends ServerException { const UserNotFoundException(String message) : super(message); } // Assuming ServerException exists
-// class AuthenticationException extends Failure { const AuthenticationException(String message) : super(message); }
-
-// enum UserRole { user, admin }
-// extension UserRoleExtension on UserRole { String get name => toString().split('.').last; }
-// UserRole? userRoleFromString(String? roleName) { ... } // Helper function (provided in UserModel)
-
-// class User { final String id; final String email; final String username; final UserRole role; final String? facultyId; final String? facultyName; final int? totalPoints; final List<String> badges; User({required this.id, required this.email, required this.username, required this.role, this.facultyId, this.facultyName, this.totalPoints, this.badges = const []}); }
-
-// class UserModel extends User { UserModel({required super.id, required super.email, required super.username, required super.role, super.facultyId, super.totalPoints, super.badges}); factory UserModel.fromJson(Map<String, dynamic> json) { ... } Map<String, dynamic> toJson() { ... } User toDomain() => User(...); }
-
-// abstract class AuthRemoteDataSource { Future<UserModel> signUpWithEmailAndPassword({required String email, required String password, required String username, required String? facultyId, required UserRole role}); Future<UserModel> signInWithEmailAndPassword({required String email, required String password}); Future<void> signOut(); Future<UserModel?> getCurrentUser(); Future<UserModel> updateUserFaculty({required String userId, required String facultyId}); }
-
-// abstract class UserLocalDataSource { Future<void> saveUser(UserModel user); Future<UserModel?> getUser(String userId); Future<void> clearUser(String userId); Future<void> clearAllUsers(); } // Defined above

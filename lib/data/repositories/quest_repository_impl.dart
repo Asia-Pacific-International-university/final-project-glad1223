@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:logger/logger.dart'; // Import the logger package
 import '../../domain/entities/quest.dart';
 import '../../domain/repositories/quest_repository.dart';
 import '../../core/error/failures.dart';
@@ -9,6 +10,17 @@ import '../models/quest_model.dart';
 class QuestRepositoryImpl implements QuestRepository {
   final QuestRemoteDataSource _remoteDataSource;
   final QuestLocalDataSource _localDataSource; // Added local data source
+  // Initialize a logger instance for this class
+  final Logger _logger = Logger(
+    printer: PrettyPrinter(
+      methodCount: 1, // Show one method call for context
+      errorMethodCount: 5, // Number of method calls if stacktrace is provided
+      lineLength: 120, // Width of the output
+      colors: true, // Colorful log messages
+      printEmojis: true, // Print emojis
+      printTime: false, // Should each log print a timestamp
+    ),
+  );
 
   QuestRepositoryImpl({
     required QuestRemoteDataSource remoteDataSource,
@@ -42,29 +54,29 @@ class QuestRepositoryImpl implements QuestRepository {
       // 1. Try to get active quest from local cache first
       final cachedQuest = await _localDataSource.getActiveQuest();
       if (cachedQuest != null) {
-        print('Returning active quest from local cache');
+        _logger.i('Returning active quest from local cache');
         return Right(cachedQuest.toDomain());
       }
 
       // 2. If not in cache or stale, fetch from remote
-      print('Fetching active quest from remote source');
+      _logger.i('Fetching active quest from remote source');
       final questModel = await _remoteDataSource.getActiveQuest();
 
       // 3. Save to local cache
       await _saveQuestToLocal(questModel);
 
       if (questModel == null) {
-        print('No active quest found remotely.');
+        _logger.i('No active quest found remotely.');
         return const Right(null); // No active quest is a valid success case
       }
-      print('Returning active quest from remote source and cached locally');
+      _logger.i('Returning active quest from remote source and cached locally');
       return Right(questModel.toDomain());
     } on Exception catch (e) {
-      print('getActiveQuest Exception: $e');
+      _logger.e('getActiveQuest Exception: $e', e);
       // If remote fetch fails, try to return from cache as fallback
       final cachedQuest = await _localDataSource.getActiveQuest();
       if (cachedQuest != null) {
-        print(
+        _logger.w(
             'Remote fetch failed, returning cached active quest as fallback.');
         return Right(cachedQuest.toDomain());
       }
@@ -80,9 +92,10 @@ class QuestRepositoryImpl implements QuestRepository {
       final resultMessage =
           await _remoteDataSource.submitTriviaAnswer(questId, answer);
       // No need to cache individual answers, as they are sent to backend.
+      _logger.i('Trivia answer submitted successfully for quest $questId');
       return Right(resultMessage);
     } on Exception catch (e) {
-      print('submitTriviaAnswer Exception: $e');
+      _logger.e('submitTriviaAnswer Exception: $e', e);
       return Left(
           ServerFailure('Failed to submit trivia answer: ${e.toString()}'));
     }
@@ -93,9 +106,10 @@ class QuestRepositoryImpl implements QuestRepository {
       String questId, String optionId) async {
     try {
       await _remoteDataSource.submitPollVote(questId, optionId);
+      _logger.i('Poll vote submitted successfully for quest $questId');
       return const Right(null);
     } on Exception catch (e) {
-      print('submitPollVote Exception: $e');
+      _logger.e('submitPollVote Exception: $e', e);
       return Left(ServerFailure('Failed to submit poll vote: ${e.toString()}'));
     }
   }
@@ -106,9 +120,10 @@ class QuestRepositoryImpl implements QuestRepository {
     try {
       await _remoteDataSource.submitCheckInLocation(
           questId, latitude, longitude);
+      _logger.i('Check-in location submitted successfully for quest $questId');
       return const Right(null);
     } on Exception catch (e) {
-      print('submitCheckInLocation Exception: $e');
+      _logger.e('submitCheckInLocation Exception: $e', e);
       return Left(ServerFailure('Failed to submit location: ${e.toString()}'));
     }
   }
@@ -118,9 +133,11 @@ class QuestRepositoryImpl implements QuestRepository {
       String questId, String imagePath) async {
     try {
       final imageUrl = await _remoteDataSource.uploadPhoto(questId, imagePath);
+      _logger
+          .i('Photo uploaded successfully for quest $questId. URL: $imageUrl');
       return Right(imageUrl);
     } on Exception catch (e) {
-      print('uploadPhoto Exception: $e');
+      _logger.e('uploadPhoto Exception: $e', e);
       return Left(ServerFailure('Failed to upload photo: ${e.toString()}'));
     }
   }
@@ -132,7 +149,7 @@ class QuestRepositoryImpl implements QuestRepository {
   //     await _remoteDataSource.submitMiniPuzzleAnswer(questId, answer);
   //     return const Right(null);
   //   } on Exception catch (e) {
-  //     print('submitMiniPuzzleAnswer Exception: $e');
+  //     _logger.e('submitMiniPuzzleAnswer Exception: $e', e);
   //     return Left(ServerFailure('Failed to submit mini-puzzle answer: ${e.toString()}'));
   //   }
   // }

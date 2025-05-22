@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/themed_button.dart';
-import 'package:final_project/core/constants/faculty_constants.dart'; // Import AppFaculties
+//import 'package:final_project/core/constants/faculty_constants.dart'; // Import AppFaculties
 
 class FacultySelectionScreen extends ConsumerStatefulWidget {
   const FacultySelectionScreen({super.key});

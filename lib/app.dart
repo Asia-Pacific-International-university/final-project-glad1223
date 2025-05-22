@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+//import 'package:provider/provider.dart';
 import 'package:final_project/core/navigation/app_router.dart';
 import 'package:final_project/core/theme/theme_provider.dart';
 import 'package:final_project/core/constants/app_constants.dart';
 import 'package:final_project/core/theme/app_theme.dart';
+import 'package:final_project/core/riverpodDI/providers.dart';
 // Import AuthProvider once created
 // import 'package:final_project/presentation/providers/auth_provider.dart';
 

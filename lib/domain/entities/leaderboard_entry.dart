@@ -1,4 +1,5 @@
 // domain/entities/leaderboard_entry.dart
+
 class LeaderboardEntry {
   final String userId;
   final String userName;

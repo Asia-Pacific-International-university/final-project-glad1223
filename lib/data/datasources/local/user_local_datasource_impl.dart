@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:logger/logger.dart'; // Import the logger package
 import 'database_helper.dart'; // Import the database helper
 import '../../models/user_model.dart'; // Import the UserModel
 import 'user_local_datasource.dart'; // Import the abstract data source
@@ -10,6 +11,17 @@ import 'dart:convert'; // For JSON encoding/decoding (for badges)
 // ========================================================================
 class UserLocalDataSourceImpl implements UserLocalDataSource {
   final DatabaseHelper _databaseHelper;
+  // Initialize a logger instance for this class
+  final Logger _logger = Logger(
+    printer: PrettyPrinter(
+      methodCount: 0, // No method calls to be displayed
+      errorMethodCount: 5, // Number of method calls if stacktrace is provided
+      lineLength: 120, // Width of the output
+      colors: true, // Colorful log messages
+      printEmojis: true, // Print emojis
+      printTime: false, // Should each log print a timestamp
+    ),
+  );
 
   UserLocalDataSourceImpl(this._databaseHelper);
 
@@ -54,7 +66,7 @@ class UserLocalDataSourceImpl implements UserLocalDataSource {
       _userModelToMap(user),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    print('UserModel ${user.id} saved/updated in SQLite');
+    _logger.i('UserModel ${user.id} saved/updated in SQLite');
   }
 
   @override
@@ -67,10 +79,10 @@ class UserLocalDataSourceImpl implements UserLocalDataSource {
     );
 
     if (maps.isNotEmpty) {
-      print('UserModel $userId retrieved from SQLite');
+      _logger.i('UserModel $userId retrieved from SQLite');
       return _userModelFromMap(maps.first);
     } else {
-      print('UserModel $userId not found in SQLite');
+      _logger.i('UserModel $userId not found in SQLite');
       return null; // User not found
     }
   }
@@ -83,13 +95,13 @@ class UserLocalDataSourceImpl implements UserLocalDataSource {
       where: 'id = ?',
       whereArgs: [userId],
     );
-    print('UserModel $userId cleared from SQLite');
+    _logger.i('UserModel $userId cleared from SQLite');
   }
 
   @override
   Future<void> clearAllUsers() async {
     final db = await _databaseHelper.database;
     await db.delete(DatabaseHelper.userTable);
-    print('All UserModels cleared from SQLite');
+    _logger.i('All UserModels cleared from SQLite');
   }
 }

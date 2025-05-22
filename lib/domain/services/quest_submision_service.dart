@@ -2,7 +2,7 @@ import 'package:dartz/dartz.dart';
 import '../../core/error/failures.dart';
 import '../../domain/repositories/quest_repository.dart';
 import '../../domain/repositories/user_repositories.dart'; // Import UserRepository
-import '../../domain/entities/user.dart'; // Import User entity
+//import '../../domain/entities/user.dart'; // Import User entity
 
 // Represents the outcome of a quest submission
 class SubmissionResult {
@@ -27,11 +27,11 @@ class SubmissionResult {
 // ========================================================================
 class QuestSubmissionService {
   final QuestRepository _questRepository;
-  final UserRepositories _userRepository; // Added UserRepository
+  final UserRepository _userRepository; // Added UserRepository
 
   QuestSubmissionService({
     required QuestRepository questRepository,
-    required UserRepositories userRepository, // Initialize UserRepository
+    required UserRepository userRepository, // Initialize UserRepository
   })  : _questRepository = questRepository,
         _userRepository = userRepository;
 
@@ -191,7 +191,8 @@ class QuestSubmissionService {
     await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
 
     // For demonstration, let's assume it's always successful for now
-    final mockResult = Right('Puzzle solved!'); // Or some backend response
+    // The fix is here: Explicitly define the Left type as Failure.
+    final Either<Failure, String> mockResult = Right('Puzzle solved!');
 
     return _handleSubmissionResponse(
       userId: userId,

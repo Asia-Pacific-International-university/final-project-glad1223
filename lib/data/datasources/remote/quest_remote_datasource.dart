@@ -1,4 +1,4 @@
-import '../../data/models/quest_model.dart';
+import 'package:final_project/data/models/quest_model.dart';
 
 abstract class QuestRemoteDataSource {
   Future<QuestModel?> getActiveQuest();

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
 import 'package:final_project/presentation/providers/profile_provider.dart'; // Import Riverpod profile provider
 import 'package:final_project/presentation/widgets/common/loading_indicator.dart';
-import 'package:final_project/domain/entities/user.dart';
+//import 'package:final_project/domain/entities/user.dart';
 import 'package:final_project/presentation/providers/auth_provider.dart'; // Import Riverpod auth provider
 
 class ProfileScreen extends ConsumerStatefulWidget {

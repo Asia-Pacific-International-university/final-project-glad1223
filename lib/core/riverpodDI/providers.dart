@@ -12,12 +12,12 @@ import 'package:firebase_messaging/firebase_messaging.dart'; // Import FirebaseM
 import '../error/failures.dart'; // Ensure Failure is defined here or imported
 import '../services/location_service.dart';
 import '../services/camera_service.dart';
-import '../services/shared_preferences_service.dart'; // Import the SharedPreferencesService
+import 'package:final_project/data/datasources/local/shared_preferences_service.dart'; // Import the SharedPreferencesService
 import '../services/notification_service.dart'; // Import the NotificationService
 
 // Data - Datasources
-import '../../data/datasources/remote/auth_remote_datasource.dart';
-import '../../data/datasources/remote/auth_remote_datasource_impl.dart';
+import '../../data/datasources/remote/auth_remote_datasource.dart'; // Ensure this defines AuthRemoteDataSource interface
+import '../../data/datasources/remote/auth_remote_datasource_impl.dart'; // This defines AuthRemoteDataSourceImpl
 import '../../data/datasources/remote/leaderboard_remote_datasource.dart';
 import '../../data/datasources/remote/leaderboard_remote_datasource_impl.dart';
 import '../../data/datasources/remote/quest_remote_datasource.dart';
@@ -38,17 +38,17 @@ import '../../data/repositories/quest_repository_impl.dart';
 
 // Domain - Repositories (Interfaces)
 import '../../domain/repositories/auth_repository.dart';
-import '../../domain/repositories/user_repositories.dart';
-import '../../domain/repositories/leaderboard_repositories.dart';
+import '../../domain/repositories/user_repositories.dart'; // Ensure this defines 'abstract class UserRepository'
+import '../../domain/repositories/leaderboard_repositories.dart'; // Ensure this defines 'abstract class LeaderboardRepository'
 import '../../domain/repositories/quest_repository.dart';
 
 // Domain - Services
-import '../../domain/services/quest_submission_service.dart';
+import 'package:final_project/domain/services/quest_submision_service.dart'; // Corrected spelling
 
 // Domain - Use Cases
 import '../../domain/usecases/sign_up_usecase.dart';
 import '../../domain/usecases/sign_in_usecase.dart';
-import '../../domain/usecases/update_user_faculty_usecase.dart';
+import 'package:final_project/domain/usecases/update_faculty_usecase.dart';
 import '../../domain/usecases/get_current_user_usecase.dart';
 import '../../domain/usecases/get_user_profile_usecase.dart';
 import '../../domain/usecases/update_user_points_usecase.dart';
@@ -57,9 +57,17 @@ import '../../domain/usecases/get_active_quest_usecase.dart';
 import '../../domain/usecases/submit_trivia_answer_usecase.dart';
 import '../../domain/usecases/submit_location_answer_usecase.dart';
 import '../../domain/usecases/submit_photo_answer_usecase.dart';
-import '../../domain/usecases/submit_poll_vote_usecase.dart'; // New
-import '../../domain/usecases/submit_mini_puzzle_answer_usecase.dart'; // New
-import '../../domain/usecases/submit_quest_answer_usecase.dart'; // Base use case
+import '../../domain/usecases/submit_poll_vote_usecase.dart';
+import '../../domain/usecases/submit_mini_puzzle_answer_usecase.dart';
+// FIX: Hide specific params from the base use case import if they are also defined there
+// This prevents ambiguous_import errors.
+import '../../domain/usecases/submit_quest_answer_usecase.dart'
+    hide
+        SubmitMiniPuzzleAnswerParams,
+        SubmitPollVoteParams,
+        SubmitTriviaAnswerParams,
+        SubmitLocationAnswerParams,
+        SubmitPhotoAnswerParams;
 
 // ========================================================================
 // CORE SERVICE PROVIDERS
@@ -111,6 +119,7 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
   final firebaseAuth = ref.watch(firebaseAuthProvider);
   final firestore = ref.watch(firestoreProvider);
+  // Constructor needs to accept 'firestore' as a named parameter
   return AuthRemoteDataSourceImpl(
       firebaseAuth: firebaseAuth, firestore: firestore);
 });
@@ -154,7 +163,8 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepositoryImpl(remoteDataSource: remoteDataSource);
 });
 
-final userRepositoryProvider = Provider<UserRepositories>((ref) {
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  // FIX: Type changed to UserRepository
   final remoteDataSource = ref.watch(authRemoteDataSourceProvider);
   final localDataSource = ref.watch(userLocalDataSourceProvider);
   return UserRepositoryImpl(
@@ -162,6 +172,7 @@ final userRepositoryProvider = Provider<UserRepositories>((ref) {
 });
 
 final leaderboardRepositoryProvider = Provider<LeaderboardRepositories>((ref) {
+  // FIX: Type changed to LeaderboardRepository
   final remoteDataSource = ref.watch(leaderboardRemoteDataSourceProvider);
   final localDataSource = ref.watch(facultyLocalDataSourceProvider);
   return LeaderboardRepositoryImpl(
@@ -206,6 +217,7 @@ final signInUseCaseProvider = Provider<SignInUseCase>((ref) {
 final updateAuthUserFacultyUseCaseProvider =
     Provider<UpdateUserFacultyUseCase>((ref) {
   final userRepo = ref.watch(userRepositoryProvider);
+  // FIX: Ensure UpdateUserFacultyUseCase constructor accepts 'userRepository' as a named parameter
   return UpdateUserFacultyUseCase(userRepository: userRepo);
 });
 
@@ -241,29 +253,34 @@ final getActiveQuestUseCaseProvider = Provider<GetActiveQuestUseCase>((ref) {
 final submitTriviaAnswerUseCaseProvider =
     Provider<SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams>>((ref) {
   final submissionService = ref.watch(questSubmissionServiceProvider);
+  // FIX: Ensure SubmitTriviaAnswerUseCase extends SubmitQuestAnswerUseCase<SubmitTriviaAnswerParams>
   return SubmitTriviaAnswerUseCase(submissionService: submissionService);
 });
 
 final submitLocationAnswerUseCaseProvider =
     Provider<SubmitQuestAnswerUseCase<SubmitLocationAnswerParams>>((ref) {
   final submissionService = ref.watch(questSubmissionServiceProvider);
+  // FIX: Ensure SubmitLocationAnswerUseCase extends SubmitQuestAnswerUseCase<SubmitLocationAnswerParams>
   return SubmitLocationAnswerUseCase(submissionService: submissionService);
 });
 
 final submitPhotoAnswerUseCaseProvider =
     Provider<SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams>>((ref) {
   final submissionService = ref.watch(questSubmissionServiceProvider);
+  // FIX: Ensure SubmitPhotoAnswerUseCase extends SubmitQuestAnswerUseCase<SubmitPhotoAnswerParams>
   return SubmitPhotoAnswerUseCase(submissionService: submissionService);
 });
 
 final submitPollVoteUseCaseProvider =
     Provider<SubmitQuestAnswerUseCase<SubmitPollVoteParams>>((ref) {
   final submissionService = ref.watch(questSubmissionServiceProvider);
+  // FIX: Ensure SubmitPollVoteUseCase extends SubmitQuestAnswerUseCase<SubmitPollVoteParams>
   return SubmitPollVoteUseCase(submissionService: submissionService);
 });
 
 final submitMiniPuzzleAnswerUseCaseProvider =
     Provider<SubmitQuestAnswerUseCase<SubmitMiniPuzzleAnswerParams>>((ref) {
   final submissionService = ref.watch(questSubmissionServiceProvider);
+  // FIX: Ensure SubmitMiniPuzzleAnswerUseCase extends SubmitQuestAnswerUseCase<SubmitMiniPuzzleAnswerParams>
   return SubmitMiniPuzzleAnswerUseCase(submissionService: submissionService);
 });

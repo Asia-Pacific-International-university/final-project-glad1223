@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logger/logger.dart'; // Import the logger package
 
 // Firebase imports for FCM and Crashlytics
 import 'package:firebase_core/firebase_core.dart';
@@ -16,6 +17,7 @@ import 'package:flutter_background_service_ios/flutter_background_service_ios.da
 import 'package:geolocator/geolocator.dart'; // For location in background
 import 'package:web_socket_channel/web_socket_channel.dart'; // For WebSocket in background
 import 'dart:async'; // For Timer in background
+import 'dart:convert'; // For jsonDecode - NEW: Explicitly imported for parsing message.data and websocket messages
 
 // Your existing project imports
 import 'core/navigation/app_router.dart';
@@ -30,6 +32,21 @@ import 'data/datasources/local/database_helper.dart'; // For local database acce
 import 'data/datasources/local/user_local_datasource_impl.dart'; // For user data in background
 import 'data/datasources/local/faculty_local_datasource_impl.dart'; // For faculty data in background
 import 'data/datasources/local/quest_local_datasource_impl.dart'; // For quest data in background
+import 'data/models/quest_model.dart'; // Assuming you have a QuestModel
+import 'data/models/user_model.dart'; // Import your UserModel
+import 'data/models/faculty_model.dart'; // Import your FacultyModel
+
+// Global logger instance
+final Logger _logger = Logger(
+  printer: PrettyPrinter(
+    methodCount: 0, // No method calls to be displayed for general app logs
+    errorMethodCount: 5, // Number of method calls if stacktrace is provided
+    lineLength: 120, // Width of the output
+    colors: true, // Colorful log messages
+    printEmojis: true, // Print emojis
+    dateTimeFormat: DateTimeFormat.none, // FIX: Replaced printTime
+  ),
+);
 
 // ========================================================================
 // 1. TOP-LEVEL FUNCTION FOR FCM BACKGROUND MESSAGES
@@ -40,18 +57,25 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-  print("Background Message Handled: ${message.messageId}");
-  print("Background Message Data: ${message.data}");
+  _logger.i("Background Message Handled: ${message.messageId}");
+  _logger.d("Background Message Data: ${message.data}");
 
   // TODO: Implement logic here to process background quest notifications.
   // This could involve saving the quest data to SQLite via your local datasources.
-  // Example:
-  // final dbHelper = DatabaseHelper();
-  // final questLocalDataSource = QuestLocalDataSourceImpl(dbHelper);
-  // if (message.data['quest'] != null) {
-  //   final questModel = QuestModel.fromJson(message.data['quest']);
-  //   await questLocalDataSource.saveQuest(questModel);
-  // }
+  final dbHelper = DatabaseHelper(); // Re-initialize in background isolate
+  await dbHelper.initDb(); // Ensure DB is initialized
+  final questLocalDataSource = QuestLocalDataSourceImpl(dbHelper);
+  if (message.data['quest'] != null) {
+    try {
+      // FIX: Ensure data is properly decoded from string to JSON map
+      final questModel = QuestModel.fromJson(jsonDecode(message.data['quest']));
+      await questLocalDataSource.saveQuest(questModel);
+      _logger.i('Background: Saved quest from FCM: ${questModel.id}');
+    } catch (e, stackTrace) {
+      _logger.e(
+          'Background: Error parsing/saving quest from FCM: $e', e, stackTrace);
+    }
+  }
 }
 
 // ========================================================================
@@ -87,24 +111,26 @@ void onStart(ServiceInstance service) async {
 
   // Initialize your database helper and local datasources for background access
   final dbHelper = DatabaseHelper();
+  await dbHelper.initDb(); // Ensure DB is initialized
   final userLocalDataSource = UserLocalDataSourceImpl(dbHelper);
   final facultyLocalDataSource = FacultyLocalDataSourceImpl(dbHelper);
   final questLocalDataSource = QuestLocalDataSourceImpl(dbHelper);
 
-  // For Android foreground service notification
+  // For Android foreground service notification commands
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
-      service.setAsForeground(true);
+      service.setForegroundMode(true); // FIX: Changed to setForegroundMode
     });
 
     service.on('setAsBackground').listen((event) {
-      service.setAsForeground(false);
+      service.setForegroundMode(false); // FIX: Changed to setForegroundMode
     });
   }
 
   // Listen for stop command from the main Isolate
   service.on('stopService').listen((event) {
     service.stopSelf();
+    _logger.i('Background service stopped.');
   });
 
   // ======================================================================
@@ -113,59 +139,90 @@ void onStart(ServiceInstance service) async {
   // ======================================================================
 
   // --- Location Tracking Placeholder ---
-  // You would typically start location tracking here.
-  // Ensure you have necessary permissions handled in the main app.
-  // This stream will run continuously as long as the service is active.
   Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 10, // Update every 10 meters
     ),
   ).listen((Position position) async {
-    print('Background Location: ${position.latitude}, ${position.longitude}');
+    _logger
+        .d('Background Location: ${position.latitude}, ${position.longitude}');
     // TODO: Process location data (e.g., calculate distance for a quest)
     // Save to local database or send to backend.
-    // Example: service.sendData({'location': {'latitude': position.latitude, 'longitude': position.longitude}});
+    // FIX: Changed to invoke with a meaningful event name
+    service.invoke('update_location', {
+      'latitude': position.latitude,
+      'longitude': position.longitude,
+      'timestamp': position.timestamp.toIso8601String()
+    });
   });
 
   // --- Real-time Leaderboard Streaming Placeholder (WebSocket) ---
-  // Connect to your WebSocket server.
-  // Replace with your actual WebSocket URL
-  final wsUrl = Uri.parse('ws://your-backend-websocket-url/leaderboard');
+  final wsUrl =
+      Uri.parse('WebSocket server started on ws://localhost:8080/leaderboard');
   WebSocketChannel? channel;
 
   void connectWebSocket() {
     try {
       channel = WebSocketChannel.connect(wsUrl);
-      print('WebSocket: Attempting to connect to $wsUrl');
+      _logger.i('WebSocket: Attempting to connect to $wsUrl');
 
       channel?.stream.listen(
         (message) async {
-          print('WebSocket: Received: $message');
+          _logger.d('WebSocket: Received: $message');
           // TODO: Process leaderboard update message
           // Parse message (e.g., JSON), update local SQLite database.
-          // Example:
-          // final Map<String, dynamic> leaderboardData = jsonDecode(message);
-          // await facultyLocalDataSource.saveFaculties(leaderboardData['faculties']);
-          // await userLocalDataSource.saveUsers(leaderboardData['users']); // If you have a saveUsers method
+          try {
+            // FIX: Ensure data is properly decoded from string to JSON map
+            final Map<String, dynamic> leaderboardData = jsonDecode(message);
 
-          // Send update to the UI if it's active
-          service.sendData({'leaderboard_update': message});
+            // Assuming your local datasources have corresponding save methods
+            if (leaderboardData.containsKey('faculties') &&
+                leaderboardData['faculties'] is List) {
+              final List<FacultyModel> faculties = (leaderboardData['faculties']
+                      as List)
+                  .map((e) => FacultyModel.fromJson(e as Map<String, dynamic>))
+                  .toList();
+              await facultyLocalDataSource.saveFaculties(faculties);
+              _logger.i(
+                  'Background: Saved ${faculties.length} faculties from WebSocket.');
+            }
+
+            if (leaderboardData.containsKey('users') &&
+                leaderboardData['users'] is List) {
+              final List<UserModel> users = (leaderboardData['users'] as List)
+                  .map((e) => UserModel.fromJson(e as Map<String, dynamic>))
+                  .toList();
+              await userLocalDataSource
+                  .saveUsers(users); // If you have a saveUsers method
+              _logger
+                  .i('Background: Saved ${users.length} users from WebSocket.');
+            }
+
+            // Send update to the UI if it's active
+            // FIX: Changed to invoke with a meaningful event name
+            service.invoke('leaderboard_update', leaderboardData);
+          } catch (e, stackTrace) {
+            _logger.e(
+                'Background: Error parsing/processing WebSocket message: $e',
+                e,
+                stackTrace);
+          }
         },
         onDone: () {
-          print('WebSocket: Disconnected. Attempting to reconnect...');
-          // Implement reconnection logic
+          _logger.w('WebSocket: Disconnected. Attempting to reconnect...');
           Timer(const Duration(seconds: 5), connectWebSocket);
         },
-        onError: (error) {
-          print('WebSocket Error: $error');
-          // Implement reconnection logic on error
+        onError: (error, stackTrace) {
+          // Added stackTrace here for better logging
+          _logger.e('WebSocket Error: $error', error, stackTrace);
           Timer(const Duration(seconds: 5), connectWebSocket);
         },
         cancelOnError: true, // Cancel stream on error, then reconnect
       );
-    } catch (e) {
-      print('WebSocket Connection Error: $e');
+    } catch (e, stackTrace) {
+      // Added stackTrace here for better logging
+      _logger.e('WebSocket Connection Error: $e', e, stackTrace);
       Timer(const Duration(seconds: 5), connectWebSocket);
     }
   }
@@ -183,7 +240,8 @@ void onStart(ServiceInstance service) async {
     }
 
     // Example of sending data to the main Isolate
-    service.sendData({
+    // FIX: Changed to invoke, used a descriptive event name
+    service.invoke('update_status', {
       "current_timestamp": DateTime.now().toIso8601String(),
       "is_running": true,
       // You can send aggregated location data or status here
@@ -219,7 +277,8 @@ void main() async {
   final DarwinInitializationSettings initializationSettingsDarwin =
       DarwinInitializationSettings(
     onDidReceiveLocalNotification: (id, title, body, payload) async {
-      print('iOS Local Notification (Foreground): $title, $body, $payload');
+      _logger.d('iOS Local Notification (Foreground): $title, $body, $payload');
+      // You might want to handle this differently, e.g., show a dialog
     },
   );
 
@@ -231,10 +290,21 @@ void main() async {
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) async {
-      print('Notification Response Payload: ${response.payload}');
+      _logger.d('Notification Response Payload: ${response.payload}');
       if (response.payload != null && response.payload!.isNotEmpty) {
-        print('Navigating to quest with ID from payload: ${response.payload}');
-        AppRouter.router.go(AppConstants.activeQuestRoute);
+        _logger
+            .i('Navigating to quest with ID from payload: ${response.payload}');
+        // Ensure router is available before navigating
+        if (AppRouter.router.canPop() || AppRouter.router.location == '/') {
+          // Check if we can pop current route or go directly to avoid issues on cold start
+          AppRouter.router.go(AppConstants.activeQuestRoute);
+        } else {
+          // This case handles cold start when the router might not be fully initialized
+          // A common pattern is to store the payload and navigate once the app is ready.
+          // For now, we just log a warning.
+          _logger.w(
+              'Router not immediately ready for navigation from notification tap. Payload: ${response.payload}');
+        }
       }
     },
   );
@@ -252,21 +322,26 @@ void main() async {
     provisional: false,
     sound: true,
   );
-  print('User notification permission status: ${settings.authorizationStatus}');
+  _logger.i(
+      'User notification permission status: ${settings.authorizationStatus}');
 
   // ======================================================================
   // 7. GET FCM TOKEN AND SEND TO YOUR BACKEND
   // ======================================================================
   String? fcmToken = await messaging.getToken();
-  print("FCM Device Token: $fcmToken");
-  // TODO: Send this `fcmToken` to your application's backend.
+  if (fcmToken != null) {
+    _logger.i("FCM Device Token: $fcmToken");
+    // TODO: Send this `fcmToken` to your application's backend.
+  } else {
+    _logger.w("FCM Device Token is null.");
+  }
 
   // ======================================================================
   // 8. LISTEN FOR FCM MESSAGES WHEN APP IS IN FOREGROUND
   // ======================================================================
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print('FCM Message Received in Foreground!');
-    print('Message data: ${message.data}');
+    _logger.i('FCM Message Received in Foreground!');
+    _logger.d('Message data: ${message.data}');
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
     if (notification != null && android != null) {
@@ -286,6 +361,11 @@ void main() async {
         ),
         payload: message.data['questId'],
       );
+      _logger
+          .i('Local notification shown for FCM message: ${notification.title}');
+    } else {
+      _logger.w(
+          'FCM foreground message received, but no notification payload to display.');
     }
   });
 
@@ -293,12 +373,14 @@ void main() async {
   // 9. LISTEN FOR FCM MESSAGES WHEN APP IS OPENED FROM NOTIFICATION TAP
   // ======================================================================
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    print('FCM Message opened app from background/terminated state!');
-    print('Notification Data: ${message.data}');
+    _logger.i('FCM Message opened app from background/terminated state!');
+    _logger.d('Notification Data: ${message.data}');
     if (message.data['questId'] != null) {
-      print(
+      _logger.i(
           'Navigating to quest with ID from opened app: ${message.data['questId']}');
       AppRouter.router.go(AppConstants.activeQuestRoute);
+    } else {
+      _logger.w('FCM opened app message received, but no questId in payload.');
     }
   });
 
@@ -308,69 +390,83 @@ void main() async {
   final service = FlutterBackgroundService();
 
   await service.configure(
+    // FIX: Removed top-level onStart, now it's only in Android/iOS configs
     androidConfiguration: AndroidConfiguration(
-      onStart:
-          onStart, // The top-level function that runs in the background Isolate
-      autoStart:
-          false, // Set to false initially, start manually when needed (e.g., after login)
-      isForegroundMode:
-          true, // Essential for continuous tasks like location tracking
-      notificationChannelId:
-          'background_service_channel', // Android 8.0+ required
-      notificationTitle: 'Campus Pulse Service',
-      notificationContent: 'Running in background',
+      onStart: onStart, // The top-level function that will be executed
+      isForegroundMode: true,
+      autoStart: true,
+      notificationChannelId: 'my_foreground_service_channel',
       initialNotificationTitle: 'Campus Pulse Service',
-      initialNotificationContent: 'Initializing...',
-      foregroundServiceNotificationId:
-          888, // Unique ID for the foreground notification
+      initialNotificationContent: 'Initializing',
+      foregroundServiceNotificationId: 888, // Unique ID for foreground service
     ),
     iosConfiguration: IosConfiguration(
-      onStart:
-          onStart, // The top-level function that runs in the background Isolate
-      autoStart: false, // Set to false initially
-      onForeground:
-          onStart, // For iOS, onStart is called for both foreground and background
-      onBackground:
-          onStart, // For iOS, onStart is called for both foreground and background
-      autoStartEvent: 'autoStart', // Custom event to trigger auto-start on iOS
+      onStart: onStart, // The top-level function that will be executed
+      autoStart: true,
+      onForeground: onStart, // FIX: Changed onForeground to onStart
+      onBackground: onStart, // FIX: Changed onBackground to onStart
     ),
   );
 
-  // You can start the service here if it should always run (e.g., for leaderboard updates)
-  // Or start it conditionally (e.g., when a user logs in, or a specific quest type starts)
-  // await service.start(); // This would start it immediately on app launch.
-  // For now, we'll keep it commented out, assuming you'll start it conditionally.
+  service.startService(); // Start the background service
 
   // ======================================================================
-  // 11. RIVERPOD PROVIDER SCOPE AND APP RUN
+  // 11. RUN THE FLUTTER APP
   // ======================================================================
   runApp(
-    const ProviderScope(
+    ProviderScope(
       child: MyApp(),
     ),
   );
 }
 
 // ========================================================================
-// 12. MYAPP WIDGET - Root of your UI
+// 12. MYAPP WIDGET
 // ========================================================================
 class MyApp extends ConsumerWidget {
-  static final GoRouter router = AppRouter().router;
-
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider);
-    ref.read(authProvider.notifier).checkInitialAuthStatus();
+    final GoRouter router = ref.watch(appRouterProvider);
+    final AppTheme currentTheme = ref.watch(themeProvider);
+
+    // FIX: Listen to background service updates for UI
+    final FlutterBackgroundService _backgroundService =
+        FlutterBackgroundService();
+    _backgroundService.on('leaderboard_update').listen((data) {
+      if (data != null) {
+        _logger.d(
+            'Main Isolate: Received leaderboard_update from background service: $data');
+        // Trigger a refresh of the leaderboard provider
+        ref
+            .read(leaderboardProvider.notifier)
+            .fetchLeaderboard(); // Assuming you have a fetchLeaderboard method
+        ref
+            .read(profileProvider.notifier)
+            .fetchUserProfile(); // Assuming you have a fetchUserProfile method if user data is updated
+      }
+    });
+
+    _backgroundService.on('update_location').listen((data) {
+      if (data != null) {
+        _logger.d(
+            'Main Isolate: Received location update from background service: $data');
+        // You might want to update a UI provider or state here if needed
+      }
+    });
+
+    _backgroundService.on('update_status').listen((data) {
+      if (data != null) {
+        _logger.d(
+            'Main Isolate: Received status update from background service: $data');
+        // Update a UI element to show service status
+      }
+    });
 
     return MaterialApp.router(
-      routerConfig: MyApp.router,
-      title: AppConstants.appName,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: themeMode,
+      routerConfig: router,
       debugShowCheckedModeBanner: false,
+      title: 'Campus Pulse',
+      theme: currentTheme.toThemeData(),
     );
   }
 }

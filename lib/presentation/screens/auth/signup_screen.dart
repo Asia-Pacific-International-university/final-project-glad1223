@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../domain/entities/user.dart';
+//import '../../../domain/entities/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../widgets/common/themed_button.dart';
-import '../../widgets/common/loading_indicator.dart';
+//import '../../widgets/common/loading_indicator.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   static const routeName = '/signup';

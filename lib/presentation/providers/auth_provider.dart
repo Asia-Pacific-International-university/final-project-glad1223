@@ -6,6 +6,8 @@ import '../../domain/entities/user.dart';
 import '../../core/error/failures.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/usecases/update_user_faculty_usecase.dart';
+import 'package:final_project/domain/usecases/update_faculty_usecase.dart';
+import 'package:final_project/domain/usecases/update_user_points_usecase.dart';
 import '../../domain/repositories/auth_repository.dart';
 // Import the Riverpod providers for use cases and repositories
 import '../../domain/usecases/get_current_user_usecase.dart'; // Assuming you have this use case

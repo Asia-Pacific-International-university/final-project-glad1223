@@ -1,21 +1,34 @@
 import 'package:dartz/dartz.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import FirebaseException
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logger/logger.dart';
 import '../../domain/entities/leaderboard_entry.dart';
-import '../../domain/repositories/leaderboard_repositories.dart';
+// FIX: Correct the import to point to the file defining the singular interface
+import '../../domain/repositories/leaderboard_repositories.dart'; // Changed from leaderboard_repositories.dart
 import '../../core/error/failures.dart';
-import '../datasources/remote/leaderboard_remote_datasource.dart'; // Import your Firestore data source
-import '../datasources/local/faculty_local_datasource.dart'; // Import your SQLite data source
-import '../models/faculty_model.dart'; // Import your FacultyModel
+import '../datasources/remote/leaderboard_remote_datasource.dart';
+import '../datasources/local/faculty_local_datasource.dart';
+import '../models/faculty_model.dart';
+import 'package:rxdart/rxdart';
+// FIX: Import the new extension
+import 'package:final_project/core/extension/stream_either_extension.dart'; // Corrected path if needed, usually 'extensions' not 'extension'
 
 // ========================================================================
 // LEADERBOARD REPOSITORY IMPLEMENTATION
-// Handles coordinating data access from remote (Firestore)
-// and local (SQLite) sources for Leaderboard (Faculty) data.
-// Implements caching logic.
 // ========================================================================
-class LeaderboardRepositoryImpl implements LeaderboardRepositories {
-  final LeaderboardRemoteDataSource _remoteDataSource; // Firestore source
-  final FacultyLocalDataSource _localDataSource; // SQLite source
+// FIX: Change 'LeaderboardRepositories' to 'LeaderboardRepository' (singular)
+class LeaderboardRepositoryImpl implements LeaderboardRepository {
+  final LeaderboardRemoteDataSource _remoteDataSource;
+  final FacultyLocalDataSource _localDataSource;
+  final Logger _logger = Logger(
+    printer: PrettyPrinter(
+      methodCount: 1,
+      errorMethodCount: 5,
+      lineLength: 120,
+      colors: true,
+      printEmojis: true,
+      dateTimeFormat: DateTimeFormat.none,
+    ),
+  );
 
   LeaderboardRepositoryImpl({
     required LeaderboardRemoteDataSource remoteDataSource,
@@ -23,110 +36,96 @@ class LeaderboardRepositoryImpl implements LeaderboardRepositories {
   })  : _remoteDataSource = remoteDataSource,
         _localDataSource = localDataSource;
 
-  // Helper to convert List<FacultyModel> to List<LeaderboardEntry>
   List<LeaderboardEntry> _mapModelsToEntries(List<FacultyModel> models) {
     return models
         .map((model) => LeaderboardEntry.fromFacultyModel(model))
         .toList();
   }
 
-  // --- Helper method to save faculty data to local cache ---
   Future<void> _saveFacultiesToLocal(List<FacultyModel> faculties) async {
     await _localDataSource.saveFaculties(faculties);
-    print('${faculties.length} FacultyModels saved to SQLite cache');
+    _logger.i('${faculties.length} FacultyModels saved to SQLite cache');
   }
 
-  // --- Helper method to get faculty data from local cache ---
   Future<List<FacultyModel>> _getFacultiesFromLocal() async {
-    // TODO: Implement staleness check here if needed (e.g., store timestamp in DB)
     return await _localDataSource.getFaculties();
   }
 
-  // --- Helper method to clear local faculty cache ---
   Future<void> _clearLocalFaculties() async {
     await _localDataSource.clearAllFaculties();
-    print('All FacultyModels cleared from SQLite cache');
+    _logger.i('All FacultyModels cleared from SQLite cache');
+  }
+
+  // Helper function for mapping errors to Failures
+  Failure _mapStreamErrorToFailure(
+      dynamic error, StackTrace stackTrace, String contextMessage) {
+    _logger.e('$contextMessage: $error', error, stackTrace);
+    if (error is FirebaseException) {
+      return ServerFailure('Firestore Stream Error: ${error.message}');
+    }
+    return ServerFailure('Unknown error in stream: ${error.toString()}');
   }
 
   @override
   Stream<Either<Failure, List<LeaderboardEntry>>> getLeaderboardStream() {
-    // For a real-time stream, we primarily rely on the remote source.
-    // However, we can seed the stream with cached data initially.
-    try {
-      // 1. Get data from local cache immediately
-      final localFaculties = _getFacultiesFromLocal(); // Get the Future
+    final localFuture = _getFacultiesFromLocal();
 
-      // 2. Get the real-time stream from the remote source
-      final remoteStream = _remoteDataSource.getFacultyLeaderboardStream();
+    final localStreamOfEntries = localFuture.asStream().map((faculties) {
+      _logger.d('Seeding leaderboard stream with local cache');
+      return _mapModelsToEntries(faculties);
+    });
 
-      // Combine the local data (as an initial value) with the remote stream
-      return remoteStream.map((facultyModels) {
-        // When new data arrives from Firestore, save it to the local cache
-        _saveFacultiesToLocal(facultyModels);
-        // Map the remote data to domain entities and return
-        return Right(_mapModelsToEntries(facultyModels));
-      }).handleError((e) {
-        // Handle errors from the remote stream
-        print('Error in remote leaderboard stream: $e');
-        if (e is FirebaseException) {
-          return Left(ServerFailure('Firestore Stream Error: ${e.message}'));
-        }
-        return Left(ServerFailure(
-            'Unknown error in leaderboard stream: ${e.toString()}'));
-      }).startWith(localFaculties.asStream().map((faculties) {
-        // Provide the locally cached data as the initial value for the stream
-        print('Seeding leaderboard stream with local cache');
-        return Right(_mapModelsToEntries(faculties));
-      }).handleError((e) {
-        // Handle errors getting initial local data
-        print('Error getting local leaderboard data: $e');
-        return Left(CacheFailure(
-            message: 'Failed to load cached leaderboard: ${e.toString()}'));
-      }));
-    } catch (e) {
-      // Handle errors setting up the stream initially
-      print('Error setting up leaderboard stream: $e');
-      return Stream.value(Left(ServerFailure(
-          'Error setting up leaderboard stream: ${e.toString()}')));
-    }
+    final localStreamWithEither = localStreamOfEntries.toEitherStream(
+        (error, stackTrace) => _mapStreamErrorToFailure(
+            error, stackTrace, 'Error getting local leaderboard data'));
+
+    final remoteSourceStream = _remoteDataSource.getFacultyLeaderboardStream();
+
+    final remoteStreamOfEntries = remoteSourceStream.map((facultyModels) {
+      _saveFacultiesToLocal(facultyModels);
+      return _mapModelsToEntries(facultyModels);
+    });
+
+    final remoteStreamWithEither = remoteStreamOfEntries.toEitherStream(
+        (error, stackTrace) => _mapStreamErrorToFailure(
+            error, stackTrace, 'Error in remote leaderboard stream'));
+
+    return remoteStreamWithEither.startWithStream(localStreamWithEither);
   }
 
   @override
   Future<Either<Failure, List<LeaderboardEntry>>> fetchLeaderboard() async {
-    // For a one-time fetch (snapshot), we can implement a cache-first strategy.
     try {
-      // 1. Try to get data from local cache first
       final cachedFaculties = await _getFacultiesFromLocal();
       if (cachedFaculties.isNotEmpty) {
-        print('Returning leaderboard from local cache');
+        _logger.i('Returning leaderboard from local cache');
         return Right(_mapModelsToEntries(cachedFaculties));
       }
 
-      // 2. If not in cache (or stale), fetch from remote (Firestore snapshot)
-      print('Fetching leaderboard from remote source');
+      _logger.i('Fetching leaderboard from remote source');
       final remoteFaculties =
           await _remoteDataSource.getFacultyLeaderboardSnapshot();
 
-      // 3. If fetched from remote, save to local cache
       await _saveFacultiesToLocal(remoteFaculties);
 
-      print('Returning leaderboard from remote source and cached locally');
+      _logger.i('Returning leaderboard from remote source and cached locally');
       return Right(_mapModelsToEntries(remoteFaculties));
-    } on FirebaseException catch (e) {
-      print('Firestore error fetching leaderboard: ${e.message}');
-      // If remote fails, try returning potentially stale cached data as a fallback
+    } on FirebaseException catch (e, stackTrace) {
+      _logger.e(
+          'Firestore error fetching leaderboard: ${e.message}', e, stackTrace);
       final cachedFaculties = await _getFacultiesFromLocal();
       if (cachedFaculties.isNotEmpty) {
-        print('Remote fetch failed, returning cached leaderboard as fallback.');
+        _logger.w(
+            'Remote fetch failed, returning cached leaderboard as fallback.');
         return Right(_mapModelsToEntries(cachedFaculties));
       }
       return Left(ServerFailure('Failed to fetch leaderboard: ${e.message}'));
-    } catch (e) {
-      print('Error fetching leaderboard: $e');
-      // If remote fails, try returning potentially stale cached data as a fallback
+    } catch (e, stackTrace) {
+      _logger.e('Error fetching leaderboard: $e', e, stackTrace);
       final cachedFaculties = await _getFacultiesFromLocal();
       if (cachedFaculties.isNotEmpty) {
-        print('Remote fetch failed, returning cached leaderboard as fallback.');
+        _logger.w(
+            'Remote fetch failed, returning cached leaderboard as fallback.');
         return Right(_mapModelsToEntries(cachedFaculties));
       }
       return Left(
@@ -134,99 +133,70 @@ class LeaderboardRepositoryImpl implements LeaderboardRepositories {
     }
   }
 
-  // --- Implement new methods for specific leaderboards with caching ---
-
   @override
   Stream<Either<Failure, List<LeaderboardEntry>>>
       getFastestLeaderboardStream() {
-    // Apply similar caching logic as getLeaderboardStream
-    try {
-      final localFaculties = _getFacultiesFromLocal(); // Get from local cache
+    final localFuture = _getFacultiesFromLocal();
 
-      final remoteStream = _remoteDataSource
-          .getFastestCompletionLeaderboardStream(); // Get remote stream
+    final localStreamOfEntries = localFuture.asStream().map((faculties) {
+      _logger.d('Seeding fastest leaderboard stream with local cache');
+      return _mapModelsToEntries(faculties);
+    });
 
-      return remoteStream.map((facultyModels) {
-        // Save the latest data from the stream to cache
-        _saveFacultiesToLocal(
-            facultyModels); // Note: This saves ALL faculties, not just fastest
-        return Right(_mapModelsToEntries(facultyModels));
-      }).handleError((e) {
-        print('Error in remote fastest leaderboard stream: $e');
-        if (e is FirebaseException) {
-          return Left(ServerFailure('Firestore Stream Error: ${e.message}'));
-        }
-        return Left(ServerFailure(
-            'Unknown error in fastest leaderboard stream: ${e.toString()}'));
-      }).startWith(localFaculties.asStream().map((faculties) {
-        // Provide cached data initially
-        print('Seeding fastest leaderboard stream with local cache');
-        // Note: Local cache is ordered by points, not fastest time.
-        // You might need to re-sort here if the local cache structure doesn't match the remote order.
-        // Or implement separate local storage for different leaderboard types.
-        // For simplicity, we'll just return the cached data as is for now.
-        return Right(_mapModelsToEntries(faculties));
-      }).handleError((e) {
-        print('Error getting local fastest leaderboard data: $e');
-        return Left(CacheFailure(
-            message:
-                'Failed to load cached fastest leaderboard: ${e.toString()}'));
-      }));
-    } catch (e) {
-      print('Error setting up fastest leaderboard stream: $e');
-      return Stream.value(Left(ServerFailure(
-          'Error setting up fastest leaderboard stream: ${e.toString()}')));
-    }
+    final localStreamWithEither = localStreamOfEntries.toEitherStream(
+        (error, stackTrace) => _mapStreamErrorToFailure(
+            error, stackTrace, 'Error getting local fastest leaderboard data'));
+
+    final remoteStream =
+        _remoteDataSource.getFastestCompletionLeaderboardStream();
+
+    final remoteStreamOfEntries = remoteStream.map((facultyModels) {
+      _saveFacultiesToLocal(facultyModels);
+      return _mapModelsToEntries(facultyModels);
+    });
+
+    final remoteStreamWithEither = remoteStreamOfEntries.toEitherStream(
+        (error, stackTrace) => _mapStreamErrorToFailure(
+            error, stackTrace, 'Error in remote fastest leaderboard stream'));
+
+    return remoteStreamWithEither.startWithStream(localStreamWithEither);
   }
 
   @override
   Future<Either<Failure, List<LeaderboardEntry>>>
       getAccuracyLeaderboardSnapshot() async {
-    // Apply similar caching logic as fetchLeaderboard
     try {
-      // 1. Try to get data from local cache first
       final cachedFaculties = await _getFacultiesFromLocal();
       if (cachedFaculties.isNotEmpty) {
-        print('Returning accuracy leaderboard from local cache');
-        // Note: Local cache is ordered by points, not accuracy.
-        // You might need to re-sort here if the local cache structure doesn't match the remote order.
-        // Or implement separate local storage for different leaderboard types.
-        // For simplicity, we'll just return the cached data as is for now.
+        _logger.i('Returning accuracy leaderboard from local cache');
         return Right(_mapModelsToEntries(cachedFaculties));
       }
 
-// 2. If not in cache, fetch from remote (Firestore snapshot)
-      print('Fetching accuracy leaderboard from remote source');
-      // Assuming you have a method like getAccuracyLeaderboardSnapshot in remoteDataSource
-      // The provided remote data source only had a stream for accuracy.
-      // Let's get one snapshot from the stream for this future method.
+      _logger.i('Fetching accuracy leaderboard from remote source');
       final remoteFaculties =
           await _remoteDataSource.getAccuracyLeaderboardStream().first;
 
-// 3. If fetched from remote, save to local cache
-      await _saveFacultiesToLocal(
-          remoteFaculties); // Note: This saves ALL faculties
+      await _saveFacultiesToLocal(remoteFaculties);
 
-      print(
+      _logger.i(
           'Returning accuracy leaderboard from remote source and cached locally');
       return Right(_mapModelsToEntries(remoteFaculties));
-    } on FirebaseException catch (e) {
-      print('Firestore error fetching accuracy leaderboard: ${e.message}');
-      // If remote fails, try returning potentially stale cached data as a fallback
+    } on FirebaseException catch (e, stackTrace) {
+      _logger.e('Firestore error fetching accuracy leaderboard: ${e.message}',
+          e, stackTrace);
       final cachedFaculties = await _getFacultiesFromLocal();
       if (cachedFaculties.isNotEmpty) {
-        print(
+        _logger.w(
             'Remote fetch failed, returning cached accuracy leaderboard as fallback.');
         return Right(_mapModelsToEntries(cachedFaculties));
       }
       return Left(
           ServerFailure('Failed to fetch accuracy leaderboard: ${e.message}'));
-    } catch (e) {
-      print('Error fetching accuracy leaderboard: $e');
-// If remote fails, try returning potentially stale cached data as a fallback
+    } catch (e, stackTrace) {
+      _logger.e('Error fetching accuracy leaderboard: $e', e, stackTrace);
       final cachedFaculties = await _getFacultiesFromLocal();
       if (cachedFaculties.isNotEmpty) {
-        print(
+        _logger.w(
             'Remote fetch failed, returning cached accuracy leaderboard as fallback.');
         return Right(_mapModelsToEntries(cachedFaculties));
       }

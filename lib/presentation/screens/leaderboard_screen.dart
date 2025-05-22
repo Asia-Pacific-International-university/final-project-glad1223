@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // Use Riverpod
 import '../../core/constants/app_constants.dart';
-import '../../providers/auth_provider.dart'; // Import Riverpod auth provider
-import '../../providers/leaderboard_provider.dart'; // Import Riverpod leaderboard provider
+import 'package:final_project/presentation/providers/auth_provider.dart'; // Import Riverpod auth provider
+import 'package:final_project/presentation/providers/leaderboard_provider.dart'; // Import Riverpod leaderboard provider
 import '../widgets/common/loading_indicator.dart';
 // import '../widgets/leaderboard/leaderboard_item.dart'; // Assuming you have this widget
 
